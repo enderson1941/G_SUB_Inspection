@@ -1,0 +1,29 @@
+// G_SUB_Inspection.idl : type library source for G_SUB_Inspection.exe
+
+// This file will be processed by the MIDL compiler to produce the
+// type library (G_SUB_Inspection.tlb).
+
+[ uuid(70B9D18F-7092-4B62-99BC-7C0A7EEFC84A), version(1.0) ]
+library G_SUB_Inspection
+{
+	importlib("stdole32.tlb");
+	importlib("stdole2.tlb");
+
+	//  Primary dispatch interface for CG_SUB_InspectionDoc
+	
+	[ uuid(2A95506E-C52C-4CFE-BCAB-ACEAE356EFEF) ]
+	dispinterface IG_SUB_Inspection
+	{
+		properties:
+			
+		methods:
+	};
+
+	//  Class information for CG_SUB_InspectionDoc
+	
+	[ uuid(C56B5EF0-4CB1-4D70-AF8D-25BA3DFFC0AC) ]
+	coclass G_SUB_Inspection
+	{
+		[default] dispinterface IG_SUB_Inspection;
+	};
+};

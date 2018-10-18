@@ -1,0 +1,82 @@
+# Prerequisites
+
+*.d
+*.db
+*.VC.db
+*.opendb
+*.aps
+*.vcxproj
+*.filters
+*.c
+*.VC
+*.vc.vc.opendb
+OpenCV_imageprocess.VC.db
+*.bmp
+*.png
+
+
+# Compiled Object files
+
+*.slo
+
+*.lo
+
+*.o
+
+*.obj
+
+
+
+# Precompiled Headers
+
+*.gch
+
+*.pch
+
+
+
+# Compiled Dynamic libraries
+
+*.so
+
+*.dylib
+
+*.dll
+
+
+
+# Fortran module files
+
+*.mod
+
+*.smod
+
+
+
+# Compiled Static libraries
+
+*.lai
+
+*.la
+
+*.a
+
+*.lib
+
+.vs
+Debug
+temp
+ipch
+video_output
+zxing
+OpenCV_i.649A7A9B.tlog
+
+# Executables
+*.bat
+*.iobj
+*.ipdb
+*.log
+*.out
+*.pdb
+*.res
+*.app

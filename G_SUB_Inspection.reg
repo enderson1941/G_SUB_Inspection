@@ -1,0 +1,17 @@
+REGEDIT
+; This .REG file may be used by your SETUP program.
+;   If a SETUP program is not available, the entries below will be
+;   registered in your InitInstance automatically with a call to
+;   CWinApp::RegisterShellFileTypes and COleObjectFactory::UpdateRegistryAll.
+
+
+HKEY_CLASSES_ROOT\G_SUB_Inspection.Application = G_SUB_Inspection Application
+
+
+HKEY_CLASSES_ROOT\G_SUB_Inspection.Application\CLSID = {C56B5EF0-4CB1-4D70-AF8D-25BA3DFFC0AC}
+
+HKEY_CLASSES_ROOT\CLSID\{C56B5EF0-4CB1-4D70-AF8D-25BA3DFFC0AC} = G_SUB_Inspection Application
+HKEY_CLASSES_ROOT\CLSID\{C56B5EF0-4CB1-4D70-AF8D-25BA3DFFC0AC}\ProgId = G_SUB_Inspection.Application
+
+
+HKEY_CLASSES_ROOT\CLSID\{C56B5EF0-4CB1-4D70-AF8D-25BA3DFFC0AC}\LocalServer32 = G_SUB_Inspection.EXE
