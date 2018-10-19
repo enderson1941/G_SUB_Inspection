@@ -391,7 +391,7 @@ int CG_SUB_InspectionDlg::planlist_ini(int mode_)
 		plan_tree.SetItemData(subRoot, 0);
 		subRoot2 = plan_tree.InsertItem(L"实际生产量", 0, 0, subRoot, TVI_LAST);
 		plan_tree.SetItemData(subRoot, 0);
-		subRoot3 = plan_tree.InsertItem(L"NG发生次数", 0, 0, subRoot, TVI_LAST);
+		subRoot3 = plan_tree.InsertItem(L"NG发生率", 0, 0, subRoot, TVI_LAST);
 		plan_tree.SetItemData(subRoot, 0);
 		plan_tree.Expand(hRoot, TVE_EXPAND);
 		plan_tree.Expand(subRoot, TVE_EXPAND);
@@ -503,7 +503,8 @@ void CG_SUB_InspectionDlg::OnNMRClickplan(NMHDR *pNMHDR, LRESULT *pResult)
 		plan_tree.Select(hItem, TVGN_CARET);
 		CString item_tiltle;
 		item_tiltle = plan_tree.GetItemText(hItem);
-		if (item_tiltle!=L"计划生产量")
+		item_tiltle = item_tiltle.Mid(0, 5);
+		if (item_tiltle != L"计划生产量")
 		{
 			return;
 		}
@@ -573,7 +574,7 @@ void CG_SUB_InspectionDlg::OnOK()
 	// TODO: Add your specialized code here and/or call the base class
 	if (mdy_pln && m_Edit)
 	{
-		OnKillfocusEdit();
+		func_btn.SetFocus();
 	}
 }
 
@@ -608,18 +609,17 @@ void CG_SUB_InspectionDlg::OnPlanmenu2modpln()
 	m_Edit.Create(ES_AUTOHSCROLL | WS_CHILD | ES_LEFT | ES_WANTRETURN,
 		CRect(0, 0, 0, 0), this, IDC_crtd_EDIT);
 
-	m_Edit.SetFont(this->GetFont(), FALSE);//设置字体,不设置这里的话上面的字会很突兀的感觉
-	m_Edit.SetParent(&plan_tree);//将list control设置为父窗口,生成的Edit才能正确定位,这个也很重要
+	m_Edit.SetFont(this->GetFont(), FALSE);
+	m_Edit.SetParent(&plan_tree);
 	CRect  EditRect;
 	plan_tree.GetItemRect(selected_item, EditRect, TRUE);
 	EditRect.SetRect(EditRect.left + EditRect.Width() + 10, EditRect.top + 1,
 		EditRect.right + EditRect.Width() + 10, EditRect.bottom - 1);
 
-	m_Edit.MoveWindow(&EditRect);//将编辑框位置放在相应单元格上
-	m_Edit.ShowWindow(SW_SHOW);//显示编辑框在单元格上面
-	m_Edit.SetFocus();//设置为焦点 
-	m_Edit.SetSel(-1);//设置光标在文本框文字的最后
-
+	m_Edit.MoveWindow(&EditRect);
+	m_Edit.ShowWindow(SW_SHOW);
+	m_Edit.SetFocus();
+	m_Edit.SetSel(-1);
 }
 
 void CG_SUB_InspectionDlg::OnKillfocusEdit()
@@ -627,6 +627,7 @@ void CG_SUB_InspectionDlg::OnKillfocusEdit()
 	mdy_pln = FALSE;
 	m_Edit.GetWindowText(mdy_data);
 	temp_str = plan_tree.GetItemText(selected_item);
+	temp_str = temp_str.Mid(0, 5);
 	plan_tree.SetItemText(selected_item, temp_str + L": " + mdy_data);
 	plan_tree.SetItemData(selected_item, _ttoi(mdy_data));
 	m_Edit.DestroyWindow();

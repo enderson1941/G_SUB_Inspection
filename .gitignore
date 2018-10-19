@@ -10,9 +10,7 @@
 *.c
 *.VC
 *.vc.vc.opendb
-OpenCV_imageprocess.VC.db
-*.bmp
-*.png
+*.jpg
 
 
 # Compiled Object files
@@ -61,18 +59,11 @@ OpenCV_imageprocess.VC.db
 
 *.a
 
-*.lib
-
 .vs
 Debug
-temp
 ipch
-video_output
-zxing
-OpenCV_i.649A7A9B.tlog
 
 # Executables
-*.bat
 *.iobj
 *.ipdb
 *.log
