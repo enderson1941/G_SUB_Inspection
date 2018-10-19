@@ -31,17 +31,17 @@ class CG_SUB_InspectionDlg : public CDialogEx
 {
 	DECLARE_DYNAMIC(CG_SUB_InspectionDlg);
 
-// Construction
+	// Construction
 public:
 	CG_SUB_InspectionDlg(CWnd* pParent = NULL);	// standard constructor
 	virtual ~CG_SUB_InspectionDlg();
 
-// Dialog Data
+	// Dialog Data
 #ifdef AFX_DESIGN_TIME
 	enum { IDD = IDD_G_SUB_INSPECTION_DIALOG };
 #endif
 
-	protected:
+protected:
 	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV support
 
 
@@ -57,24 +57,46 @@ protected:
 
 	DECLARE_MESSAGE_MAP()
 public:
+
+	typedef struct inspect_data
+	{
+		int real_inspect_number = 0;
+		int real_NG_number = 0;
+		CString model_name;
+		BOOL inspect_sgn = FALSE;
+	}; 
+	inspect_data insp_dat;
+
 	int temp_int = 0;
+	int newmodel_no = 0;
 	int plan_num = 0;
 	double scale_index;
+	char* plan_filename = "plan.ini";
+
 	BOOL load_sgn = FALSE;
+	BOOL inquery_pswd = FALSE;
 	BOOL pswd_state = FALSE;
 	BOOL inquery_pln = FALSE;
 	BOOL inquery_dat = FALSE;
 	BOOL add_pln = FALSE;
+	BOOL add_md = FALSE;
 	BOOL mdy_pln = FALSE;
+	BOOL inspect_sgn = FALSE;
 	CString model_add;
 	CString temp_str;
 	CString mdy_data;
+	CString current_date;
+	Mat paint_ = Mat(1024, 1280, CV_8UC3, Scalar::all(240));
+
+	INIParser plan_parser;
+	HTREEITEM* new_item;
 	HTREEITEM selected_item;
 	HTREEITEM hRoot;
 	HTREEITEM subRoot;
 	HTREEITEM subRoot1;
 	HTREEITEM subRoot2;
 	HTREEITEM subRoot3;
+	HTREEITEM subRoot4;
 	CRect ori_rect;
 	CRect datepick_;
 	CRect mdl_sel;
@@ -86,9 +108,16 @@ public:
 	CEdit m_Edit;
 	CStatic inspec_pic;
 	CDateTimeCtrl datepick;
+	CComboBox model_sel;
+
 	int planlist_ini(int mode_);
+	void recordTreeNode(CTreeCtrl& m_tree, HTREEITEM hTreeItem,
+		UINT& fileSum, int& layer, CString appPathFile);
+	void queryTreeNode(CTreeCtrl& m_tree, HTREEITEM& hTreeItem, CString appPathFile);
 	void OnKillfocusEdit();
+	void functionarea_init(int mode_);
 	void disp_image(UINT disp_ID, Mat dsp_img, CWnd* pt, CRect& img_rect, int cam_index = 0);
+	virtual void OnOK();
 	afx_msg void OnBnClickedfuncbutton();
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
 	afx_msg void OnEnChangepswd();
@@ -97,12 +126,12 @@ public:
 	afx_msg void OnNMRClickplan(NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void OnPlanmenu1chkpln();
 	afx_msg void OnPlanmenu1chkdata();
-	virtual void OnOK();
 	afx_msg void OnDtnDatetimechangedatepick(NMHDR *pNMHDR, LRESULT *pResult);
-	CComboBox model_sel;
 	afx_msg void OnPlanmenu1addpln();
 	afx_msg void OnCbnSelchangemodelsel();
 	afx_msg void OnPlanmenu2modpln();
+	afx_msg void OnPlanmenu1addmodel();
+	afx_msg void OnPlanmenu1addcontent();
 };
 
 // ClxTreeCtrl

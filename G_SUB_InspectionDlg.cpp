@@ -119,6 +119,8 @@ BEGIN_MESSAGE_MAP(CG_SUB_InspectionDlg, CDialogEx)
 	ON_CBN_SELCHANGE(IDC_model_sel, &CG_SUB_InspectionDlg::OnCbnSelchangemodelsel)
 	ON_EN_KILLFOCUS(IDC_crtd_EDIT, &CG_SUB_InspectionDlg::OnKillfocusEdit)
 	ON_COMMAND(ID_PLANMENU2_modpln, &CG_SUB_InspectionDlg::OnPlanmenu2modpln)
+	ON_COMMAND(ID_PLANMENU1_addmodel, &CG_SUB_InspectionDlg::OnPlanmenu1addmodel)
+	ON_COMMAND(ID_PLANMENU1_addcontent, &CG_SUB_InspectionDlg::OnPlanmenu1addcontent)
 END_MESSAGE_MAP()
 
 
@@ -157,18 +159,26 @@ BOOL CG_SUB_InspectionDlg::OnInitDialog()
 	gsub_ins = this;
 	CenterWindow();
 	//
-	pWnd = GetDlgItem(IDC_func_button);
-	pWnd->GetWindowRect(ori_rect);
-	pWnd->SetWindowPos(NULL, 0, 0, ori_rect.Width() + 170, ori_rect.Height(),
-		SWP_NOZORDER | SWP_NOMOVE);
-	pWnd = GetDlgItem(IDC_datepick);
-	pWnd->GetWindowRect(datepick_);
-	ScreenToClient(datepick_);
-	pWnd = GetDlgItem(IDC_model_sel);
-	pWnd->GetWindowRect(mdl_sel);
-	ScreenToClient(mdl_sel);
+	functionarea_init(-1);
 
-	info_edit.SetWindowText(L"G-SUB03外观检查软件");
+	vector<CString> strVecAccount;
+	CString strConfigIniPath = _T("init.ini");
+	CStdioFile fileAccount;
+	if (fileAccount.Open(strConfigIniPath, CFile::typeUnicode | CFile::modeReadWrite))
+	{
+		CString strValue(_T("\0"));
+		char * pOldLocale = _strdup(setlocale(LC_CTYPE, NULL));
+		setlocale(LC_CTYPE, "chs");
+		while (fileAccount.ReadString(strValue))
+		{
+			strVecAccount.push_back(strValue);
+			info_edit.ReplaceSel(strValue + L"\r\n");
+			strValue.Empty();
+		}
+		setlocale(LC_CTYPE, pOldLocale);
+		free(pOldLocale);
+	}
+	fileAccount.Close();
 	
 	COLORREF oldColor = RGB(240, 240, 240);
 	plan_tree.SetBkColor(oldColor);
@@ -231,36 +241,55 @@ HCURSOR CG_SUB_InspectionDlg::OnQueryDragIcon()
 	return static_cast<HCURSOR>(m_hIcon);
 }
 
-// Automation servers should not exit when a user closes the UI
-//  if a controller still holds on to one of its objects.  These
-//  message handlers make sure that if the proxy is still in use,
-//  then the UI is hidden but the dialog remains around if it
-//  is dismissed.
-
-		/*if (pswd_state)
-		{
-			CString pswd_text;
-			pswd_edt.GetWindowText(pswd_text);
-			if (pswd_text != L"fxsz")
-			{
-				info_edit.SetWindowText(L"wrong pswd");
-				pswd_edt.SetWindowText(NULL);
-				OnBnClickeduser();
-			}
-		}*/
-
+//function button
 void CG_SUB_InspectionDlg::OnBnClickedfuncbutton()
 {
 	// TODO: Add your control notification handler code here
-	Mat* img = new Mat[3];
-	img[0] = imread("lena.jpg");
-	CRect img_rect = CRect(0, 0, 100, 100);
-	load_sgn = TRUE;
-	disp_image(IDC_inspec, img[0], gsub_ins, img_rect, temp_int);
-	temp_int++;
+	if (!inspect_sgn)
+	{
+		functionarea_init(0);
+		if (add_pln)
+		{
+			add_pln = FALSE;
+			UINT fileSum = 0;
+			int layer = 1;
+			CString appPathFile;
+			appPathFile.Format(L"temp\\plan\\" + plan_tree.GetItemText(hRoot) + L".ini");
+			unsigned short int sUnicodeFlag = 0xfeff;
+			FILE *fp;
+			fp = _wfopen(appPathFile, _T("wb"));
+			fwrite(&sUnicodeFlag, sizeof(short int), 1, fp);
+			fclose(fp);
+			recordTreeNode(plan_tree, hRoot, fileSum, layer, appPathFile);
+			//
+			CString _str;
+			_str.Format(L"%d", fileSum);
+			WritePrivateProfileString(L"INFO", L"filesum", _str, appPathFile);
+		}
+		int ncode = planlist_ini(2);
+		if (ncode != -1)
+		{
+			func_btn.SetWindowText(L"停止检测");
+			pswd_state = FALSE;
+			inspect_sgn = TRUE;
+			Mat pa_ = imread("lena.jpg");
+			disp_image(IDC_inspec, pa_, gsub_ins, CRect(0, 0, 100, 100), -1);
+		}
+		
+	}
+	else
+	{
+		inspect_sgn = FALSE;
+		func_btn.SetWindowText(L"开始检测");
+		plan_tree.DeleteAllItems();
+		load_sgn = TRUE;
+		disp_image(IDC_inspec, paint_, gsub_ins, CRect(0, 0, 100, 100), -1);
+	}
+	SetDlgItemText(IDC_plan_area, L"当日生产计划");
 }
 
-void CG_SUB_InspectionDlg::disp_image(UINT disp_ID, Mat dsp_img, CWnd* pt, CRect& img_rect, int cam_index)
+void CG_SUB_InspectionDlg::disp_image(UINT disp_ID, Mat dsp_img, CWnd* pt, 
+	CRect& img_rect, int cam_index)
 {
 	double index_x = 1.0;
 	double index_y = 1.0;
@@ -348,14 +377,33 @@ void CG_SUB_InspectionDlg::OnTimer(UINT_PTR nIDEvent)
 	// TODO: Add your message handler code here and/or call default
 	switch (nIDEvent)
 	{
+	case -2:
+	{
+		HWND hWnd = ::FindWindow(NULL, L"异常信息");
+		if (hWnd) 
+		{
+			keybd_event(13, 0, 0, 0); 
+			KillTimer(nIDEvent); 
+		}
+		break;
+	}
 	case -1:
 	{
 		KillTimer(nIDEvent);
 		planlist_ini(0);
-		Mat paint_ = Mat(1024, 1280, CV_8UC3, Scalar::all(240));
 		load_sgn = TRUE;
 		disp_image(IDC_inspec, paint_, gsub_ins, CRect(0, 0, 100, 100));
 		func_btn.SetFocus();
+		break;
+	}
+	case 0:
+	{
+		KillTimer(nIDEvent);
+		info_edit.SetWindowText(L"");
+	}
+	case 1:
+	{
+
 		break;
 	}
 	default:
@@ -369,22 +417,47 @@ int CG_SUB_InspectionDlg::planlist_ini(int mode_)
 	int nReturn = 0;
 	switch (mode_)
 	{
-	case 0:
+	case -2:
 	{
-		plan_tree.DeleteAllItems();
-		CTime time(CTime::GetCurrentTime());
-		CString currentTime;
-		currentTime.Format(L"%04d-%02d-%02d", time.GetYear(),
-			time.GetMonth(),
-			time.GetDay());
 
-		hRoot = plan_tree.InsertItem(currentTime, 0, 0, TVI_ROOT, TVI_LAST);
 		break;
 	}
-	case 1:
+	case -1:
+	{
+		plan_tree.DeleteAllItems();
+		model_sel.GetWindowText(model_add);
+		temp_str.Format(L"检查项目%d", newmodel_no + 1);
+		//model name
+		hRoot = plan_tree.InsertItem(model_add, 0, 0, TVI_ROOT, TVI_LAST);
+		new_item[newmodel_no] = plan_tree.InsertItem(temp_str, 0, 0, hRoot, TVI_LAST);
+		//camera index
+		subRoot = plan_tree.InsertItem(L"相机编号", 0, 0, new_item[newmodel_no], TVI_LAST);
+		//inspect content name
+		subRoot1 = plan_tree.InsertItem(L"检查内容", 0, 0, new_item[newmodel_no], TVI_LAST);
+		//inspect image name
+		subRoot2 = plan_tree.InsertItem(L"图像名称", 0, 0, new_item[newmodel_no], TVI_LAST);
+		//inspect ROI
+		subRoot3 = plan_tree.InsertItem(L"ROI设定", 0, 0, new_item[newmodel_no], TVI_LAST);
+		//inspect threshold
+		subRoot4 = plan_tree.InsertItem(L"检查阈值", 0, 0, new_item[newmodel_no], TVI_LAST);
+		plan_tree.Expand(hRoot, TVE_EXPAND);
+		plan_tree.Expand(new_item[newmodel_no], TVE_EXPAND);
+		break;
+	}
+	case 0://init
+	{
+		plan_tree.DeleteAllItems();
+		hRoot = plan_tree.InsertItem(current_date, 0, 0, TVI_ROOT, TVI_LAST);
+		break;
+	}
+	case 1://add
 	{
 		plan_num++;
 		model_sel.GetWindowText(model_add);
+		if (plan_tree.GetItemText(hRoot) == L"")
+		{
+			hRoot = plan_tree.InsertItem(current_date, 0, 0, TVI_ROOT, TVI_LAST);
+		}
 		subRoot = plan_tree.InsertItem(model_add, 0, 0, hRoot, TVI_LAST);
 		plan_tree.SetItemData(subRoot, plan_num);
 		subRoot1 = plan_tree.InsertItem(L"计划生产量", 0, 0, subRoot, TVI_LAST);
@@ -397,6 +470,57 @@ int CG_SUB_InspectionDlg::planlist_ini(int mode_)
 		plan_tree.Expand(subRoot, TVE_EXPAND);
 		break;
 	}
+	case 2://check plan
+	{
+		CString temp_;
+		plan_tree.DeleteAllItems();
+		if (inspect_sgn)
+		{
+			temp_ = current_date;
+		}
+		else
+		{
+			datepick.GetWindowText(temp_);
+		}
+		temp_str.Format(L"temp\\plan\\" + temp_ + L".ini");
+		USES_CONVERSION;
+		char* file_nme = T2A(temp_str.GetBuffer(0));
+		temp_str.ReleaseBuffer();
+		if (_access(file_nme, 0) == -1)
+		{
+			SetTimer(0, 900, NULL);
+			info_edit.SetWindowText(L"无法查询生产计划，请确认日期正确。\
+\r\n或添加当日生产计划。");
+			nReturn = - 1;
+		}
+		else
+		{
+			queryTreeNode(plan_tree, hRoot, temp_str);
+		}
+		break;
+	}
+	case 3://check dat
+	{
+		CString temp_;
+		plan_tree.DeleteAllItems();
+		datepick.GetWindowText(temp_);
+		temp_str.Format(L"temp\\error\\" + temp_ + L".ini");
+
+		USES_CONVERSION;
+		char* file_nme = T2A(temp_str.GetBuffer(0));
+		temp_str.ReleaseBuffer();
+		if (_access(file_nme, 0) == -1)
+		{
+			SetTimer(0, 900, NULL);
+			info_edit.SetWindowText(L"无法查询检查数据，请确认日期正确。");
+		}
+		else
+		{
+			queryTreeNode(plan_tree, hRoot, temp_str);
+		}
+		break;
+	}
+	
 	default:
 		break;
 	}
@@ -404,40 +528,6 @@ int CG_SUB_InspectionDlg::planlist_ini(int mode_)
 
 	return nReturn;
 }
-
-/*
-
-int oldState = user.GetCheck();
-if (m_userType == 0)
-{
-m_userType = -1;
-user.SetCheck(0);
-pWnd = GetDlgItem(IDC_func_button);
-pWnd->SetWindowPos(NULL, 0, 0, ori_rect.Width() + 135, ori_rect.Height(),
-SWP_NOZORDER | SWP_NOMOVE);
-pswd_edt.ShowWindow(FALSE);
-//
-pWnd = GetDlgItem(IDC_datepick);
-pWnd->SetWindowPos(NULL, datepick_.TopLeft().x, datepick_.TopLeft().y,
-datepick_.Width(), datepick_.Height(), SWP_NOZORDER);
-datepick.ShowWindow(FALSE);
-//
-pswd_state = FALSE;
-}
-else if (m_userType == -1)
-{
-m_userType = 0;
-user.SetCheck(1);
-pWnd = GetDlgItem(IDC_func_button);
-pWnd->SetWindowPos(NULL, 0, 0, ori_rect.Width(), ori_rect.Height(),
-SWP_NOZORDER | SWP_NOMOVE);
-pswd_edt.ShowWindow(TRUE);
-pswd_edt.SetFocus();
-}
-
-*/
-
-
 
 void CG_SUB_InspectionDlg::OnEnChangepswd()
 {
@@ -448,24 +538,30 @@ void CG_SUB_InspectionDlg::OnEnChangepswd()
 	// TODO:  Add your control notification handler code here
 	CString pswd_text;
 	pswd_edt.GetWindowText(pswd_text);
-	if (pswd_text == L"f")
+	if (add_md)
 	{
-		pswd_state = TRUE;
-		pswd_edt.SetWindowText(NULL);
-		pswd_edt.ShowWindow(FALSE);
-		if (add_pln)
+		if (pswd_text == L"h")
 		{
-			model_sel.ShowWindow(TRUE);
-			pWnd = GetDlgItem(IDC_model_sel);
-			pWnd->SetWindowPos(NULL, mdl_sel.TopLeft().x, mdl_sel.TopLeft().y - 40,
-				mdl_sel.Width(), mdl_sel.Height() + 100, SWP_NOZORDER);
+			pswd_state = TRUE;
+			pswd_edt.SetWindowText(NULL);
+			functionarea_init(2);
+			SetDlgItemText(IDC_plan_area, L"添加机种信息");
 		}
-		else if (inquery_pln || inquery_dat)
+	}
+	else
+	{
+		if (pswd_text == L"f")
 		{
-			datepick.ShowWindow(TRUE);
-			pWnd = GetDlgItem(IDC_datepick);
-			pWnd->SetWindowPos(NULL, datepick_.TopLeft().x, datepick_.TopLeft().y - 80,
-				datepick_.Width(), datepick_.Height() + 80, SWP_NOZORDER);
+			pswd_state = TRUE;
+			pswd_edt.SetWindowText(NULL);
+			if (add_pln)
+			{
+				functionarea_init(2);
+			}
+			else if (inquery_pln || inquery_dat)
+			{
+				functionarea_init(3);
+			}
 		}
 	}
 }
@@ -488,6 +584,12 @@ void CG_SUB_InspectionDlg::OnNMRClickplan(NMHDR *pNMHDR, LRESULT *pResult)
 {
 	// TODO: Add your control notification handler code here
 	*pResult = 0;
+	if (inspect_sgn)
+	{
+		SetTimer(-2, 900, NULL);
+		MessageBox(L"请先停止当前检测。", L"异常信息", MB_ICONINFORMATION | MB_OK);
+		return;
+	}
 	// Load menu
 	CMenu m_Menu, *p_Menu = NULL;
 	m_Menu.LoadMenu(IDR_MENU1);
@@ -504,17 +606,17 @@ void CG_SUB_InspectionDlg::OnNMRClickplan(NMHDR *pNMHDR, LRESULT *pResult)
 		CString item_tiltle;
 		item_tiltle = plan_tree.GetItemText(hItem);
 		item_tiltle = item_tiltle.Mid(0, 5);
-		if (item_tiltle != L"计划生产量")
-		{
-			return;
-		}
-		else
+		if (item_tiltle == L"计划生产量" || add_md)
 		{
 			selected_item = hItem;
 			p_Menu = (CMenu*)m_Menu.GetSubMenu(1);//0
 			if (p_Menu != NULL)
 				p_Menu->TrackPopupMenu(TPM_RIGHTBUTTON | TPM_LEFTALIGN, pt.x, pt.y, this);
 			p_Menu = NULL;
+		}
+		else
+		{
+			return;
 		}
 	
 	}
@@ -527,80 +629,33 @@ void CG_SUB_InspectionDlg::OnNMRClickplan(NMHDR *pNMHDR, LRESULT *pResult)
 	}
 }
 
-void CG_SUB_InspectionDlg::OnPlanmenu1chkpln()
-{
-	// TODO: Add your command handler code here
-	inquery_pln = TRUE;
-	if (!pswd_state)
-	{
-		pWnd = GetDlgItem(IDC_func_button);
-		pWnd->SetWindowPos(NULL, 0, 0, ori_rect.Width(), ori_rect.Height(),
-			SWP_NOZORDER | SWP_NOMOVE);
-		pswd_edt.ShowWindow(TRUE);
-		pswd_edt.SetFocus();
-	}
-}
-
-void CG_SUB_InspectionDlg::OnPlanmenu1chkdata()
-{
-	// TODO: Add your command handler code here
-	inquery_dat = TRUE;
-	if (!pswd_state)
-	{
-		pWnd = GetDlgItem(IDC_func_button);
-		pWnd->SetWindowPos(NULL, 0, 0, ori_rect.Width(), ori_rect.Height(),
-			SWP_NOZORDER | SWP_NOMOVE);
-		pswd_edt.ShowWindow(TRUE);
-		pswd_edt.SetFocus();
-	}
-}
-
 void CG_SUB_InspectionDlg::OnPlanmenu1addpln()
 {
 	// TODO: Add your command handler code here
 	add_pln = TRUE;
 	if (!pswd_state)
 	{
-		pWnd = GetDlgItem(IDC_func_button);
-		pWnd->SetWindowPos(NULL, 0, 0, ori_rect.Width(), ori_rect.Height(),
-			SWP_NOZORDER | SWP_NOMOVE);
-		pswd_edt.ShowWindow(TRUE);
-		pswd_edt.SetFocus();
+		functionarea_init(1);
 	}
-}
-
-void CG_SUB_InspectionDlg::OnOK()
-{
-	// TODO: Add your specialized code here and/or call the base class
-	if (mdy_pln && m_Edit)
+	else
 	{
-		func_btn.SetFocus();
+		functionarea_init(2);
 	}
 }
 
-
-void CG_SUB_InspectionDlg::OnDtnDatetimechangedatepick(NMHDR *pNMHDR, LRESULT *pResult)
+void CG_SUB_InspectionDlg::OnPlanmenu1chkpln()
 {
-	LPNMDATETIMECHANGE pDTChange = reinterpret_cast<LPNMDATETIMECHANGE>(pNMHDR);
-	// TODO: Add your control notification handler code here
-	*pResult = 0;
-	CTime m_date;  
-	datepick.GetTime(m_date); 
-	CString temp_;
-	datepick.GetWindowText(temp_);
-	info_edit.SetWindowText(temp_);
+	// TODO: Add your command handler code here
+	inquery_pln = TRUE;
+	if (!pswd_state)
+	{
+		functionarea_init(1);
+	}
+	else
+	{
+		functionarea_init(3);
+	}
 }
-
-
-
-
-
-void CG_SUB_InspectionDlg::OnCbnSelchangemodelsel()
-{
-	// TODO: Add your control notification handler code here
-	planlist_ini(1);
-}
-
 
 void CG_SUB_InspectionDlg::OnPlanmenu2modpln()
 {
@@ -622,6 +677,221 @@ void CG_SUB_InspectionDlg::OnPlanmenu2modpln()
 	m_Edit.SetSel(-1);
 }
 
+void CG_SUB_InspectionDlg::OnPlanmenu1chkdata()
+{
+	// TODO: Add your command handler code here
+	inquery_dat = TRUE;
+	if (!pswd_state)
+	{
+		functionarea_init(1);
+	}
+	else
+	{
+		functionarea_init(3);
+	}
+	
+	//CString appPathFile;
+	//appPathFile.Format(L"temp\\error\\2018-10-21.ini");
+	//unsigned short int sUnicodeFlag = 0xfeff;
+	//FILE *fp;
+	//fp = _wfopen(appPathFile, _T("wb"));
+	//fwrite(&sUnicodeFlag, sizeof(short int), 1, fp);
+	//fclose(fp);
+	//CString _str;
+	//WritePrivateProfileString(L"NODE0", L"name", L"2018-10-21", appPathFile);
+	//_str.Format(L"%d", 0);
+	//WritePrivateProfileString(L"NODE0", L"index", _str, appPathFile);
+	//_str.Format(L"%d", 0);
+	//WritePrivateProfileString(L"NODE0", L"id", _str, appPathFile);
+	//_str.Format(L"%d", 1);
+	//WritePrivateProfileString(L"NODE0", L"layer", _str, appPathFile);
+	////
+	//WritePrivateProfileString(L"NODE1" , L"name", L"11-15-35-AJ6", appPathFile);
+	//_str.Format(L"%d", 1);
+	//WritePrivateProfileString(L"NODE1" , L"index", _str, appPathFile);
+	//_str.Format(L"%d", 0);
+	//WritePrivateProfileString(L"NODE1" , L"id", _str, appPathFile);
+	//_str.Format(L"%d", 2);
+	//WritePrivateProfileString(L"NODE1" , L"layer", _str, appPathFile);
+	////
+	//WritePrivateProfileString(L"NODE2", L"name", L"固定块1-异品检出", appPathFile);
+	//_str.Format(L"%d", 2);
+	//WritePrivateProfileString(L"NODE2", L"index", _str, appPathFile);
+	//_str.Format(L"%d", 0);
+	//WritePrivateProfileString(L"NODE2", L"id", _str, appPathFile);
+	//_str.Format(L"%d", 3);
+	//WritePrivateProfileString(L"NODE2", L"layer", _str, appPathFile);
+	////
+	//WritePrivateProfileString(L"NODE3", L"name", L"11-17-46-JG3", appPathFile);
+	//_str.Format(L"%d", 3);
+	//WritePrivateProfileString(L"NODE3", L"index", _str, appPathFile);
+	//_str.Format(L"%d", 0);
+	//WritePrivateProfileString(L"NODE3", L"id", _str, appPathFile);
+	//_str.Format(L"%d", 2);
+	//WritePrivateProfileString(L"NODE3", L"layer", _str, appPathFile);
+	////
+	//WritePrivateProfileString(L"NODE4", L"name", L"卡脚3-异品检出", appPathFile);
+	//_str.Format(L"%d", 4);
+	//WritePrivateProfileString(L"NODE4", L"index", _str, appPathFile);
+	//_str.Format(L"%d", 0);
+	//WritePrivateProfileString(L"NODE4", L"id", _str, appPathFile);
+	//_str.Format(L"%d", 3);
+	//WritePrivateProfileString(L"NODE4", L"layer", _str, appPathFile);
+	////
+	//WritePrivateProfileString(L"NODE5", L"name", L"11-17-55-AJ6", appPathFile);
+	//_str.Format(L"%d", 5);
+	//WritePrivateProfileString(L"NODE5", L"index", _str, appPathFile);
+	//_str.Format(L"%d", 0);
+	//WritePrivateProfileString(L"NODE5", L"id", _str, appPathFile);
+	//_str.Format(L"%d", 2);
+	//WritePrivateProfileString(L"NODE5", L"layer", _str, appPathFile);
+	////
+	//WritePrivateProfileString(L"NODE6", L"name", L"标签2-欠品检出", appPathFile);
+	//_str.Format(L"%d", 6);
+	//WritePrivateProfileString(L"NODE6", L"index", _str, appPathFile);
+	//_str.Format(L"%d", 0);
+	//WritePrivateProfileString(L"NODE6", L"id", _str, appPathFile);
+	//_str.Format(L"%d", 3);
+	//WritePrivateProfileString(L"NODE6", L"layer", _str, appPathFile);
+	//_str.Format(L"%d", 7);
+	//WritePrivateProfileString(L"INFO", L"filesum", _str, appPathFile);
+
+}
+
+void CG_SUB_InspectionDlg::OnOK()
+{
+	// TODO: Add your specialized code here and/or call the base class
+	if (mdy_pln && m_Edit)
+	{
+		func_btn.SetFocus();
+	}
+	if (inquery_pswd)
+	{
+		SetTimer(-2, 900, NULL);
+		if (MessageBox(L"密码错误。",L"异常信息", MB_ICONERROR|MB_OK) == IDOK)
+		{
+			pswd_edt.SetWindowText(NULL);
+			pswd_state = FALSE;
+			temp_int--;
+		}
+		if (temp_int < 1)
+		{
+			functionarea_init(0);
+			inquery_pswd = FALSE;
+			pswd_state = FALSE;
+			add_md = FALSE;
+			return;
+		}
+	}
+}
+
+void CG_SUB_InspectionDlg::OnDtnDatetimechangedatepick(NMHDR *pNMHDR, LRESULT *pResult)
+{
+	LPNMDATETIMECHANGE pDTChange = reinterpret_cast<LPNMDATETIMECHANGE>(pNMHDR);
+	// TODO: Add your control notification handler code here
+	*pResult = 0;
+	CTime m_date;  
+	datepick.GetTime(m_date);
+	if (inquery_dat)
+	{
+		planlist_ini(3);
+	}
+	else if (inquery_pln)
+	{
+		planlist_ini(2);
+	}
+}
+
+void CG_SUB_InspectionDlg::functionarea_init(int mode_)
+{
+	inquery_pswd = FALSE;
+	switch (mode_)
+	{
+	case -1:
+	{
+		pWnd = GetDlgItem(IDC_func_button);
+		pWnd->GetWindowRect(ori_rect);
+		pWnd = GetDlgItem(IDC_datepick);
+		pWnd->GetWindowRect(datepick_);
+		ScreenToClient(datepick_);
+		pWnd = GetDlgItem(IDC_model_sel);
+		pWnd->GetWindowRect(mdl_sel);
+		ScreenToClient(mdl_sel);
+		pWnd = GetDlgItem(IDC_func_button);
+		pWnd->SetWindowPos(NULL, 0, 0, ori_rect.Width() + 170, ori_rect.Height(),
+			SWP_NOZORDER | SWP_NOMOVE);
+		CTime time(CTime::GetCurrentTime());
+		CString currentTime;
+		currentTime.Format(L"%04d-%02d-%02d", time.GetYear(),
+			time.GetMonth(),
+			time.GetDay());
+		current_date = currentTime;
+		break;
+	}
+	case 0:
+	{
+		pswd_edt.ShowWindow(FALSE);
+		datepick.ShowWindow(FALSE);
+		model_sel.ShowWindow(FALSE);
+		pWnd = GetDlgItem(IDC_func_button);
+		pWnd->SetWindowPos(NULL, 0, 0, ori_rect.Width() + 170, ori_rect.Height(),
+			SWP_NOZORDER | SWP_NOMOVE);
+		break;
+	}
+	case 1://pswd
+	{
+		temp_int = 3;
+		datepick.ShowWindow(FALSE);
+		model_sel.ShowWindow(FALSE);
+		pWnd = GetDlgItem(IDC_func_button);
+		pWnd->SetWindowPos(NULL, 0, 0, ori_rect.Width(), ori_rect.Height(),
+			SWP_NOZORDER | SWP_NOMOVE);
+		pswd_edt.ShowWindow(TRUE);
+		pswd_edt.SetFocus();
+		inquery_pswd = TRUE;
+		break;
+	}
+	case 2://add
+	{
+		pswd_edt.ShowWindow(FALSE);
+		datepick.ShowWindow(FALSE);
+		model_sel.ShowWindow(TRUE);
+		pWnd = GetDlgItem(IDC_model_sel);
+		pWnd->SetWindowPos(NULL, mdl_sel.TopLeft().x, mdl_sel.TopLeft().y - 40,
+			mdl_sel.Width(), mdl_sel.Height() + 100, SWP_NOZORDER);
+		SetDlgItemText(IDC_plan_area, L"添加生产计划");
+		break;
+	}
+	case 3://chk
+	{
+		pswd_edt.ShowWindow(FALSE);
+		model_sel.ShowWindow(FALSE);
+		datepick.ShowWindow(TRUE);
+		pWnd = GetDlgItem(IDC_datepick);
+		pWnd->SetWindowPos(NULL, datepick_.TopLeft().x, datepick_.TopLeft().y - 80,
+			datepick_.Width(), datepick_.Height() + 80, SWP_NOZORDER);
+		SetDlgItemText(IDC_plan_area, L"数据查询");
+		break;
+	}
+	default:
+		break;
+	}
+
+}
+
+void CG_SUB_InspectionDlg::OnCbnSelchangemodelsel()
+{
+	// TODO: Add your control notification handler code here
+	if (add_md)
+	{
+		planlist_ini(-1);
+	}
+	else
+	{
+		planlist_ini(1);
+	}
+}
+
 void CG_SUB_InspectionDlg::OnKillfocusEdit()
 {
 	mdy_pln = FALSE;
@@ -631,4 +901,120 @@ void CG_SUB_InspectionDlg::OnKillfocusEdit()
 	plan_tree.SetItemText(selected_item, temp_str + L": " + mdy_data);
 	plan_tree.SetItemData(selected_item, _ttoi(mdy_data));
 	m_Edit.DestroyWindow();
+}
+
+//write
+void CG_SUB_InspectionDlg::recordTreeNode(CTreeCtrl& m_tree, HTREEITEM hTreeItem,
+	UINT& fileSum, int& layer, CString appPathFile)
+{
+	CString   strNode, _str, _id, _layer; //TVIS_BOLD
+	_str.Format(L"%d", fileSum++);
+	strNode = m_tree.GetItemText(hTreeItem);
+	_id.Format(L"%d", m_tree.GetItemData(hTreeItem));
+	_layer.Format(L"%d", layer);
+	WritePrivateProfileString(L"NODE" + _str, L"name", strNode, appPathFile);
+	WritePrivateProfileString(L"NODE" + _str, L"index", _str, appPathFile);
+	WritePrivateProfileString(L"NODE" + _str, L"id", _id, appPathFile);
+	WritePrivateProfileString(L"NODE" + _str, L"layer", _layer, appPathFile);
+	HTREEITEM hFirstChild = m_tree.GetChildItem(hTreeItem);
+	if (hFirstChild != NULL)
+	{
+		layer++;
+		recordTreeNode(m_tree, hFirstChild, fileSum, layer, appPathFile);
+		layer--;
+	}
+	hFirstChild = m_tree.GetNextItem(hTreeItem, TVGN_NEXT);
+	if (hFirstChild != NULL)
+		recordTreeNode(m_tree, hFirstChild, fileSum, layer, appPathFile);
+}
+
+//read
+void CG_SUB_InspectionDlg::queryTreeNode(CTreeCtrl& m_tree, HTREEITEM& hTreeItem, 
+	CString appPathFile)
+{
+	TCHAR   inBuf[255];
+	CString   _layer, strNode, _str;
+	int currLayer = 0;
+	int _id = 0;
+	int rec_layer = 0;
+	HTREEITEM m_htreeItem = TVI_ROOT;// TVI_ROOT;
+	HTREEITEM m_ntreeItem = TVI_ROOT;
+	//------------------
+	plan_num = 0;
+	int _fileSum = GetPrivateProfileInt(L"INFO", L"filesum", NULL, appPathFile);
+	for (int i = 0; i < _fileSum; i++)
+	{
+		_str.Format(L"%d", i);
+		_layer.Format(L"layer%d", i);
+		GetPrivateProfileString(L"NODE" + _str, L"layer", NULL, inBuf, 255, appPathFile);
+		_layer = inBuf;
+		rec_layer = _ttoi(_layer);
+		GetPrivateProfileString(L"NODE" + _str, L"name", NULL, inBuf, 255, appPathFile);
+		strNode = inBuf;
+		GetPrivateProfileString(L"NODE" + _str, L"id", NULL, inBuf, 255, appPathFile);
+		_id = _ttoi(inBuf);
+		if (rec_layer == 1)//root
+		{
+			hTreeItem = m_tree.InsertItem(strNode, 0, 0);
+			m_tree.SetItemData(hTreeItem, 0);
+			m_htreeItem = hTreeItem;
+			currLayer = rec_layer;
+		}
+		else
+		{
+			if (rec_layer < currLayer)//up
+			{
+				m_ntreeItem = m_htreeItem;
+				plan_num++;
+				while (rec_layer != currLayer)
+				{
+					m_ntreeItem = m_tree.GetParentItem(m_ntreeItem);
+					--currLayer;
+				}
+				m_ntreeItem = m_tree.GetParentItem(m_ntreeItem);
+				m_htreeItem = m_tree.InsertItem(strNode, 0, 0, m_ntreeItem, TVI_LAST);
+				m_tree.SetItemData(m_htreeItem, _id);
+			}
+			else if (rec_layer > currLayer)//low
+			{
+				m_htreeItem = m_tree.InsertItem(strNode, 0, 0, m_htreeItem, TVI_LAST);
+				m_tree.SetItemData(m_htreeItem, _id);
+				currLayer++;
+				m_tree.Expand(m_tree.GetParentItem(m_htreeItem), TVE_EXPAND);
+			}
+			else if (rec_layer == currLayer)//same
+			{
+				m_ntreeItem = m_tree.GetParentItem(m_htreeItem);
+				m_htreeItem = m_tree.InsertItem(strNode, 0, 0, m_ntreeItem, TVI_LAST);
+				m_tree.SetItemData(m_htreeItem, _id);
+			}
+		}
+	}
+	plan_num++;
+}
+
+void CG_SUB_InspectionDlg::OnPlanmenu1addmodel()
+{
+	// TODO: Add your command handler code here
+	add_md = TRUE;
+	if (!pswd_state)
+	{
+		new_item =new HTREEITEM[15];
+		functionarea_init(1);
+	}
+}
+
+void CG_SUB_InspectionDlg::OnPlanmenu1addcontent()
+{
+	// TODO: Add your command handler code here
+	if (pswd_state  && add_md )//== TRUE
+	{
+		planlist_ini(-2);
+	}
+	else
+	{
+		SetTimer(0, 100, NULL);
+		info_edit.SetWindowText(L"no use");
+		return;
+	}
 }
