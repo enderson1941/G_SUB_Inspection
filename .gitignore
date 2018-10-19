@@ -4,10 +4,6 @@
 *.db
 *.VC.db
 *.opendb
-*.aps
-*.vcxproj
-*.filters
-*.c
 *.VC
 *.vc.vc.opendb
 *.jpg
