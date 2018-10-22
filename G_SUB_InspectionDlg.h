@@ -68,11 +68,15 @@ public:
 	inspect_data insp_dat;
 
 	int temp_int = 0;
+	int temp_index = 0;
 	int newmodel_no = 0;
 	int plan_num = 0;
 	double scale_index;
 	char* plan_filename = "plan.ini";
 
+	HICON* icon_file;
+	CImageList icontree_list;
+	CImageList* m_pImageList;
 	BOOL load_sgn = FALSE;
 	BOOL inquery_pswd = FALSE;
 	BOOL pswd_state = FALSE;
@@ -82,14 +86,17 @@ public:
 	BOOL add_md = FALSE;
 	BOOL mdy_pln = FALSE;
 	BOOL inspect_sgn = FALSE;
+	BOOL m_bIsDrag = FALSE;
 	CString model_add;
 	CString temp_str;
 	CString mdy_data;
 	CString current_date;
+	CString* treeNode_str;
 	Mat paint_ = Mat(1024, 1280, CV_8UC3, Scalar::all(240));
 
 	INIParser plan_parser;
 	HTREEITEM* new_item;
+	HTREEITEM m_hDragItem;
 	HTREEITEM selected_item;
 	HTREEITEM hRoot;
 	HTREEITEM subRoot;
@@ -111,6 +118,8 @@ public:
 	CComboBox model_sel;
 
 	int planlist_ini(int mode_);
+	int index_numbering(int mode_);
+	int copy_item(HTREEITEM item, int index_);
 	void recordTreeNode(CTreeCtrl& m_tree, HTREEITEM hTreeItem,
 		UINT& fileSum, int& layer, CString appPathFile);
 	void queryTreeNode(CTreeCtrl& m_tree, HTREEITEM& hTreeItem, CString appPathFile);
@@ -132,6 +141,9 @@ public:
 	afx_msg void OnPlanmenu2modpln();
 	afx_msg void OnPlanmenu1addmodel();
 	afx_msg void OnPlanmenu1addcontent();
+	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
+	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
+	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
 };
 
 // ClxTreeCtrl

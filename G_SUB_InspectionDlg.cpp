@@ -121,6 +121,9 @@ BEGIN_MESSAGE_MAP(CG_SUB_InspectionDlg, CDialogEx)
 	ON_COMMAND(ID_PLANMENU2_modpln, &CG_SUB_InspectionDlg::OnPlanmenu2modpln)
 	ON_COMMAND(ID_PLANMENU1_addmodel, &CG_SUB_InspectionDlg::OnPlanmenu1addmodel)
 	ON_COMMAND(ID_PLANMENU1_addcontent, &CG_SUB_InspectionDlg::OnPlanmenu1addcontent)
+	ON_WM_LBUTTONDOWN()
+	ON_WM_LBUTTONUP()
+	ON_WM_MOUSEMOVE()
 END_MESSAGE_MAP()
 
 
@@ -179,7 +182,16 @@ BOOL CG_SUB_InspectionDlg::OnInitDialog()
 		free(pOldLocale);
 	}
 	fileAccount.Close();
-	
+
+	icon_file = new HICON[2];
+	icontree_list.Create(25, 25, ILC_COLOR32, 3, 3);
+	//
+	icon_file[0] = AfxGetApp()->LoadIcon(IDI_ICON1);
+	icon_file[1] = AfxGetApp()->LoadIcon(IDI_ICON2);
+	icontree_list.Add(icon_file[0]);
+	icontree_list.Add(icon_file[1]);
+	plan_tree.SetImageList(&icontree_list, TVSIL_NORMAL);
+
 	COLORREF oldColor = RGB(240, 240, 240);
 	plan_tree.SetBkColor(oldColor);
 	model_sel.AddString(L"AJ6");
@@ -248,9 +260,10 @@ void CG_SUB_InspectionDlg::OnBnClickedfuncbutton()
 	if (!inspect_sgn)
 	{
 		functionarea_init(0);
-		if (add_pln)
+		if (add_pln || mdy_pln)
 		{
 			add_pln = FALSE;
+			mdy_pln = FALSE;
 			UINT fileSum = 0;
 			int layer = 1;
 			CString appPathFile;
@@ -379,11 +392,17 @@ void CG_SUB_InspectionDlg::OnTimer(UINT_PTR nIDEvent)
 	{
 	case -2:
 	{
-		HWND hWnd = ::FindWindow(NULL, L"异常信息");
+		HWND hWnd = ::FindWindow(NULL, L"异常信息"); 
 		if (hWnd) 
 		{
 			keybd_event(13, 0, 0, 0); 
 			KillTimer(nIDEvent); 
+		}
+		hWnd = ::FindWindow(NULL, L"提示信息"); 
+		if (hWnd)
+		{
+			keybd_event(13, 0, 0, 0);
+			KillTimer(nIDEvent);
 		}
 		break;
 	}
@@ -426,20 +445,26 @@ int CG_SUB_InspectionDlg::planlist_ini(int mode_)
 	{
 		plan_tree.DeleteAllItems();
 		model_sel.GetWindowText(model_add);
-		temp_str.Format(L"检查项目%d", newmodel_no + 1);
+		temp_str.Format(treeNode_str[0] + L"%d", newmodel_no + 1);
 		//model name
 		hRoot = plan_tree.InsertItem(model_add, 0, 0, TVI_ROOT, TVI_LAST);
 		new_item[newmodel_no] = plan_tree.InsertItem(temp_str, 0, 0, hRoot, TVI_LAST);
+		plan_tree.SetItemData(new_item[newmodel_no], 0);
 		//camera index
-		subRoot = plan_tree.InsertItem(L"相机编号", 0, 0, new_item[newmodel_no], TVI_LAST);
+		subRoot = plan_tree.InsertItem(treeNode_str[1], 0, 0, new_item[newmodel_no], TVI_LAST);
+		plan_tree.SetItemData(subRoot, 1);
 		//inspect content name
-		subRoot1 = plan_tree.InsertItem(L"检查内容", 0, 0, new_item[newmodel_no], TVI_LAST);
+		subRoot1 = plan_tree.InsertItem(treeNode_str[2], 0, 0, new_item[newmodel_no], TVI_LAST);
+		plan_tree.SetItemData(subRoot1, 2);
 		//inspect image name
-		subRoot2 = plan_tree.InsertItem(L"图像名称", 0, 0, new_item[newmodel_no], TVI_LAST);
+		subRoot2 = plan_tree.InsertItem(treeNode_str[3], 0, 0, new_item[newmodel_no], TVI_LAST);
+		plan_tree.SetItemData(subRoot2, 3);
 		//inspect ROI
-		subRoot3 = plan_tree.InsertItem(L"ROI设定", 0, 0, new_item[newmodel_no], TVI_LAST);
+		subRoot3 = plan_tree.InsertItem(treeNode_str[4], 0, 0, new_item[newmodel_no], TVI_LAST);
+		plan_tree.SetItemData(subRoot3, 4);
 		//inspect threshold
-		subRoot4 = plan_tree.InsertItem(L"检查阈值", 0, 0, new_item[newmodel_no], TVI_LAST);
+		subRoot4 = plan_tree.InsertItem(treeNode_str[5], 0, 0, new_item[newmodel_no], TVI_LAST);
+		plan_tree.SetItemData(subRoot4, 5);
 		plan_tree.Expand(hRoot, TVE_EXPAND);
 		plan_tree.Expand(new_item[newmodel_no], TVE_EXPAND);
 		break;
@@ -458,14 +483,14 @@ int CG_SUB_InspectionDlg::planlist_ini(int mode_)
 		{
 			hRoot = plan_tree.InsertItem(current_date, 0, 0, TVI_ROOT, TVI_LAST);
 		}
-		subRoot = plan_tree.InsertItem(model_add, 0, 0, hRoot, TVI_LAST);
+		subRoot = plan_tree.InsertItem(model_add, 1, 1, hRoot, TVI_LAST);
 		plan_tree.SetItemData(subRoot, plan_num);
-		subRoot1 = plan_tree.InsertItem(L"计划生产量", 0, 0, subRoot, TVI_LAST);
-		plan_tree.SetItemData(subRoot, 0);
-		subRoot2 = plan_tree.InsertItem(L"实际生产量", 0, 0, subRoot, TVI_LAST);
-		plan_tree.SetItemData(subRoot, 0);
-		subRoot3 = plan_tree.InsertItem(L"NG发生率", 0, 0, subRoot, TVI_LAST);
-		plan_tree.SetItemData(subRoot, 0);
+		subRoot1 = plan_tree.InsertItem(treeNode_str[0], 1, 1, subRoot, TVI_LAST);
+		plan_tree.SetItemData(subRoot1, 0);
+		subRoot2 = plan_tree.InsertItem(treeNode_str[1], 1, 1, subRoot, TVI_LAST);
+		plan_tree.SetItemData(subRoot2, 0);
+		subRoot3 = plan_tree.InsertItem(treeNode_str[2], 1, 1, subRoot, TVI_LAST);
+		plan_tree.SetItemData(subRoot3, 0);
 		plan_tree.Expand(hRoot, TVE_EXPAND);
 		plan_tree.Expand(subRoot, TVE_EXPAND);
 		break;
@@ -488,6 +513,7 @@ int CG_SUB_InspectionDlg::planlist_ini(int mode_)
 		temp_str.ReleaseBuffer();
 		if (_access(file_nme, 0) == -1)
 		{
+			inquery_pln = FALSE;
 			SetTimer(0, 900, NULL);
 			info_edit.SetWindowText(L"无法查询生产计划，请确认日期正确。\
 \r\n或添加当日生产计划。");
@@ -511,6 +537,7 @@ int CG_SUB_InspectionDlg::planlist_ini(int mode_)
 		temp_str.ReleaseBuffer();
 		if (_access(file_nme, 0) == -1)
 		{
+			inquery_dat = FALSE;
 			SetTimer(0, 900, NULL);
 			info_edit.SetWindowText(L"无法查询检查数据，请确认日期正确。");
 		}
@@ -577,6 +604,33 @@ void CG_SUB_InspectionDlg::OnTvnBegindragplan(NMHDR *pNMHDR, LRESULT *pResult)
 {
 	LPNMTREEVIEW pNMTreeView = reinterpret_cast<LPNMTREEVIEW>(pNMHDR);
 	// TODO: Add your control notification handler code here
+	m_hDragItem = pNMTreeView->itemNew.hItem;
+	CPoint treePt = pNMTreeView->ptDrag;
+	CString label_;
+	MapWindowPoints(&plan_tree, &treePt, 1);
+	if (NULL == m_hDragItem)
+	{
+		return;
+	}
+	label_ = plan_tree.GetItemText(plan_tree.GetParentItem(m_hDragItem));
+	if (label_ != current_date)
+	{
+		return;
+
+	}
+
+	m_pImageList = plan_tree.CreateDragImage(m_hDragItem);
+	if (NULL == m_pImageList)
+	{
+		return;
+	}
+
+	m_pImageList->BeginDrag(0, CPoint(0, 0)); //拖拽图像相对于鼠标焦点的偏移坐标
+	m_pImageList->DragEnter(&plan_tree, treePt);//设置图像初次显示的位置（包含偏移量）并锁定窗口为m_treeIndicators
+	m_bIsDrag = TRUE;
+	mdy_pln = TRUE;
+	SetCapture();
+
 	*pResult = 0;
 }
 
@@ -588,6 +642,12 @@ void CG_SUB_InspectionDlg::OnNMRClickplan(NMHDR *pNMHDR, LRESULT *pResult)
 	{
 		SetTimer(-2, 900, NULL);
 		MessageBox(L"请先停止当前检测。", L"异常信息", MB_ICONINFORMATION | MB_OK);
+		return;
+	}
+	if (mdy_pln == TRUE && add_md == FALSE)
+	{
+		SetTimer(-2, 900, NULL);
+		MessageBox(L"请单击“开始检测”保存当前计划。", L"提示信息", MB_ICONINFORMATION | MB_OK);
 		return;
 	}
 	// Load menu
@@ -633,6 +693,11 @@ void CG_SUB_InspectionDlg::OnPlanmenu1addpln()
 {
 	// TODO: Add your command handler code here
 	add_pln = TRUE;
+	delete[] treeNode_str;
+	treeNode_str = new CString[3];
+	treeNode_str[0] = L"计划生产量";
+	treeNode_str[1] = L"实际生产量";
+	treeNode_str[2] = L"NG发生率";
 	if (!pswd_state)
 	{
 		functionarea_init(1);
@@ -894,11 +959,19 @@ void CG_SUB_InspectionDlg::OnCbnSelchangemodelsel()
 
 void CG_SUB_InspectionDlg::OnKillfocusEdit()
 {
-	mdy_pln = FALSE;
+	CString tmp_node;
 	m_Edit.GetWindowText(mdy_data);
 	temp_str = plan_tree.GetItemText(selected_item);
-	temp_str = temp_str.Mid(0, 5);
-	plan_tree.SetItemText(selected_item, temp_str + L": " + mdy_data);
+	int size_ = temp_str.ReverseFind(':');
+	if (size_ == -1)
+	{
+		tmp_node = temp_str;
+	}
+	else
+	{
+		tmp_node = temp_str.Mid(0, size_);
+	}
+	plan_tree.SetItemText(selected_item, tmp_node + L": " + mdy_data);
 	plan_tree.SetItemData(selected_item, _ttoi(mdy_data));
 	m_Edit.DestroyWindow();
 }
@@ -972,12 +1045,12 @@ void CG_SUB_InspectionDlg::queryTreeNode(CTreeCtrl& m_tree, HTREEITEM& hTreeItem
 					--currLayer;
 				}
 				m_ntreeItem = m_tree.GetParentItem(m_ntreeItem);
-				m_htreeItem = m_tree.InsertItem(strNode, 0, 0, m_ntreeItem, TVI_LAST);
+				m_htreeItem = m_tree.InsertItem(strNode, 1, 1, m_ntreeItem, TVI_LAST);
 				m_tree.SetItemData(m_htreeItem, _id);
 			}
 			else if (rec_layer > currLayer)//low
 			{
-				m_htreeItem = m_tree.InsertItem(strNode, 0, 0, m_htreeItem, TVI_LAST);
+				m_htreeItem = m_tree.InsertItem(strNode, 1, 1, m_htreeItem, TVI_LAST);
 				m_tree.SetItemData(m_htreeItem, _id);
 				currLayer++;
 				m_tree.Expand(m_tree.GetParentItem(m_htreeItem), TVE_EXPAND);
@@ -985,7 +1058,7 @@ void CG_SUB_InspectionDlg::queryTreeNode(CTreeCtrl& m_tree, HTREEITEM& hTreeItem
 			else if (rec_layer == currLayer)//same
 			{
 				m_ntreeItem = m_tree.GetParentItem(m_htreeItem);
-				m_htreeItem = m_tree.InsertItem(strNode, 0, 0, m_ntreeItem, TVI_LAST);
+				m_htreeItem = m_tree.InsertItem(strNode, 1, 1, m_ntreeItem, TVI_LAST);
 				m_tree.SetItemData(m_htreeItem, _id);
 			}
 		}
@@ -997,6 +1070,14 @@ void CG_SUB_InspectionDlg::OnPlanmenu1addmodel()
 {
 	// TODO: Add your command handler code here
 	add_md = TRUE;
+	delete[] treeNode_str;
+	treeNode_str = new CString[6];
+	treeNode_str[0] = L"检查项目";
+	treeNode_str[1] = L"相机编号";
+	treeNode_str[2] = L"检查内容";
+	treeNode_str[3] = L"图像名称";
+	treeNode_str[4] = L"ROI设定";
+	treeNode_str[5] = L"检查阈值";
 	if (!pswd_state)
 	{
 		new_item =new HTREEITEM[15];
@@ -1017,4 +1098,133 @@ void CG_SUB_InspectionDlg::OnPlanmenu1addcontent()
 		info_edit.SetWindowText(L"no use");
 		return;
 	}
+}
+
+void CG_SUB_InspectionDlg::OnLButtonDown(UINT nFlags, CPoint point)
+{
+	// TODO: Add your message handler code here and/or call default
+
+	CDialogEx::OnLButtonDown(nFlags, point);
+}
+
+void CG_SUB_InspectionDlg::OnLButtonUp(UINT nFlags, CPoint point)
+{
+	// TODO: Add your message handler code here and/or call default
+	if (m_bIsDrag)
+	{
+		plan_tree.SelectItem(NULL);
+		CPoint treePt(point);
+		MapWindowPoints(&plan_tree, &treePt, 1);
+		HTREEITEM hItem = plan_tree.HitTest(treePt);
+		if (NULL != hItem)
+		{
+			int index_ = plan_tree.GetItemData(hItem);
+			copy_item(hItem, index_);
+		}
+		else
+		{
+			if (MessageBox(L"是否删除所选生产计划 ?", L"Warning", MB_ICONWARNING | MB_OKCANCEL) == IDOK)
+			{
+				index_numbering(1);
+			}
+			else
+			{
+				return;
+			}
+		}
+		plan_tree.SelectDropTarget(NULL);
+		m_pImageList->DragLeave(&plan_tree);
+		m_pImageList->EndDrag();
+	}
+	m_bIsDrag = FALSE;
+	::ReleaseCapture();
+	CDialogEx::OnLButtonUp(nFlags, point);
+}
+
+void CG_SUB_InspectionDlg::OnMouseMove(UINT nFlags, CPoint point)
+{
+	// TODO: Add your message handler code here and/or call default
+	if (m_bIsDrag)
+	{
+		CPoint treePt(point);
+		CPoint screenPt(point);
+		MapWindowPoints(&plan_tree, &treePt, 1);
+		ClientToScreen(&screenPt);
+		CWnd* pCurWindow = WindowFromPoint(screenPt);
+		if (pCurWindow != &plan_tree)
+		{
+			m_pImageList->DragShowNolock(FALSE);
+			plan_tree.SelectDropTarget(m_hDragItem);
+		}
+		else
+		{
+			HTREEITEM hItem = plan_tree.HitTest(treePt);
+			if (NULL != hItem)
+			{
+				m_pImageList->DragShowNolock(FALSE);//
+				plan_tree.SelectDropTarget(hItem);
+				m_pImageList->DragShowNolock(TRUE);//
+			}
+		}
+		m_pImageList->DragMove(treePt);
+	}
+	CDialogEx::OnMouseMove(nFlags, point);
+}
+
+int CG_SUB_InspectionDlg::index_numbering(int mode_)
+{
+	HTREEITEM temp_item;
+
+	switch (mode_)
+	{
+	case 0:
+	{
+		int index_ = 0;
+		temp_item = plan_tree.GetChildItem(hRoot);
+		while (temp_item != NULL)
+		{
+			plan_tree.SetItemData(temp_item, index_);
+			temp_item = plan_tree.GetNextSiblingItem(temp_item);
+			index_++;
+		}
+		break;
+	}
+	case 1:
+	{
+		plan_tree.DeleteItem(m_hDragItem);
+		index_numbering(0);
+		break;
+	}
+	default:
+		break;
+	}
+	return -1;
+}
+
+int CG_SUB_InspectionDlg::copy_item(HTREEITEM item, int index_)
+{
+	HTREEITEM hItem = item;
+	CString strDrag = plan_tree.GetItemText(m_hDragItem);
+	int datDrag = plan_tree.GetItemData(m_hDragItem);
+	//
+	HTREEITEM new_item = plan_tree.InsertItem(strDrag, 1, 1, hRoot, hItem);
+	plan_tree.SelectItem(hItem);
+	plan_tree.SetItemData(new_item, datDrag);
+	m_pImageList->DragShowNolock(FALSE);
+	if (plan_tree.ItemHasChildren(m_hDragItem))
+	{
+		hItem = plan_tree.GetChildItem(m_hDragItem);
+		while (hItem != NULL)
+		{
+			strDrag = plan_tree.GetItemText(hItem);
+			datDrag = plan_tree.GetItemData(hItem);
+			HTREEITEM new_child = plan_tree.InsertItem(strDrag, 1, 1, new_item, TVI_LAST);
+			plan_tree.SetItemData(new_child, datDrag);
+			hItem = plan_tree.GetNextSiblingItem(hItem);
+		}
+	}
+	plan_tree.Expand(new_item, TVE_EXPAND);
+	plan_tree.DeleteItem(m_hDragItem);
+	index_numbering(0);
+	return -1;
 }

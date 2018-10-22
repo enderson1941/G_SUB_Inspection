@@ -71,5 +71,11 @@
     <Image Include="res\G_SUB_Inspection.ico">
       <Filter>Resource Files</Filter>
     </Image>
+    <Image Include="res\icon_date.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="res\icon_plan.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
   </ItemGroup>
 </Project>
