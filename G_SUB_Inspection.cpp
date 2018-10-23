@@ -5,6 +5,7 @@
 #include "stdafx.h"
 #include "G_SUB_Inspection.h"
 #include "G_SUB_InspectionDlg.h"
+#include "SplashWnd.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -110,7 +111,8 @@ BOOL CG_SUB_InspectionApp::InitInstance()
 			return FALSE;
 	}
 
-	CG_SUB_InspectionDlg dlg;
+	//CG_SUB_InspectionDlg dlg;
+	SplashWnd dlg;
 	m_pMainWnd = &dlg;
 	INT_PTR nResponse = dlg.DoModal();
 	if (nResponse == IDOK)

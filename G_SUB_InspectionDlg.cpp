@@ -18,6 +18,8 @@
 #include "fstream"
 #include "io.h"
 
+
+
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
@@ -169,34 +171,30 @@ BOOL CG_SUB_InspectionDlg::OnInitDialog()
 	CStdioFile fileAccount;
 	if (fileAccount.Open(strConfigIniPath, CFile::typeUnicode | CFile::modeReadWrite))
 	{
-		CString strValue(_T("\0"));
-		char * pOldLocale = _strdup(setlocale(LC_CTYPE, NULL));
-		setlocale(LC_CTYPE, "chs");
-		while (fileAccount.ReadString(strValue))
+		CString strValue;
+		fileAccount.ReadString(strValue);
+		strValue.Empty();
+		while (strValue != L"D")
 		{
-			strVecAccount.push_back(strValue);
-			info_edit.ReplaceSel(strValue + L"\r\n");
+			if (!strValue.IsEmpty())
+			{
+				strVecAccount.push_back(strValue);
+				info_edit.ReplaceSel(strValue + L"\r\n");
+			}
 			strValue.Empty();
+			fileAccount.ReadString(strValue);
 		}
-		setlocale(LC_CTYPE, pOldLocale);
-		free(pOldLocale);
 	}
 	fileAccount.Close();
-
-	icon_file = new HICON[2];
-	icontree_list.Create(25, 25, ILC_COLOR32, 3, 3);
-	//
-	icon_file[0] = AfxGetApp()->LoadIcon(IDI_ICON1);
-	icon_file[1] = AfxGetApp()->LoadIcon(IDI_ICON2);
-	icontree_list.Add(icon_file[0]);
-	icontree_list.Add(icon_file[1]);
-	plan_tree.SetImageList(&icontree_list, TVSIL_NORMAL);
-
+	
 	COLORREF oldColor = RGB(240, 240, 240);
 	plan_tree.SetBkColor(oldColor);
+	plan_tree.SetImageList(&theApp.icontree_list, TVSIL_NORMAL);
+
 	model_sel.AddString(L"AJ6");
 	model_sel.AddString(L"JG3");
 	model_sel.AddString(L"TAA");
+	
 	datepick.SetFormat(L"yyyy-MM-dd");
 	//repaint screen
 	SetTimer(-1, 10, NULL);
@@ -413,6 +411,85 @@ void CG_SUB_InspectionDlg::OnTimer(UINT_PTR nIDEvent)
 		load_sgn = TRUE;
 		disp_image(IDC_inspec, paint_, gsub_ins, CRect(0, 0, 100, 100));
 		func_btn.SetFocus();
+		//
+		CString m_szDbFile = _T("data_base/G_SUB.db");
+		CDbSQLite sqlite;
+		CString db_command;
+		BOOL fTest = sqlite.Open(m_szDbFile);
+
+		if (!fTest)
+		{
+			CString szError = _T("Could not open ");
+			szError += m_szDbFile;
+			AfxMessageBox(szError);
+			return;
+		}
+
+		fTest = sqlite.DirectStatement(_T("CREATE TABLE system_data (i_index, current_date, production_index)"));
+		/*db_command.Format(_T("INSERT INTO system_data (current_date) VALUES ('%s')"), L"2018-10-23");
+		fTest = sqlite.DirectStatement(db_command);*/
+
+		//db_command.Format(_T("UPDATE foo SET bar = '2018-10-23'"));//, currentTime
+		//fTest = sqlite.DirectStatement(db_command);
+
+
+		/*fTest = sqlite.DirectStatement(_T("CREATE TABLE foo (bar, baz, Name)"));
+
+		if (!fTest)
+		{
+			AfxMessageBox(_T("Couldn't create table foo"));
+		}*/
+
+
+
+
+		/*CDbSQLite sqlite;
+		CSqlStatement *stmt;
+
+		BOOL access_sign = sqlite.Open(theApp.Currentdir_ + _T("\\data_base\\G_SUB.db"));
+		CTime time(CTime::GetCurrentTime());
+		CString currentTime;
+		currentTime.Format(L"%04d-%02d-%02d", time.GetYear(),
+			time.GetMonth(),
+			time.GetDay());
+		CString db_command;
+		db_command.Format(_T("SELECT * FROM system WHERE i_index == %d"), 1);
+		db_st = fy_db.Statement(db_command);
+		if (db_st != NULL)
+		{
+			db_st->NextRow();
+			
+			
+		}
+
+		db_command.Format(_T("UPDATE system SET current_date = '2018-10-23'"));//, currentTime
+		access_sign = sqlite.DirectStatement(db_command);*/
+
+		/*sqlite3 *db;
+		int rc;
+		char* errmsg;
+		rc = sqlite3_open16("D:\\sub.db", &db);
+
+		if (rc) 
+		{
+			error_message.Format(L"Can't open database: %s\r\n", sqlite3_errmsg(db));
+			info_edit.ReplaceSel(error_message);
+		}
+		else 
+		{
+			info_edit.ReplaceSel(L"Opened database successfully.\r\n");
+		}
+		rc = sqlite3_exec(db, "update 'system' set 'current_date' = '2018-10-23'", NULL, NULL, &errmsg);	
+		if (rc != SQLITE_OK) 
+		{ 
+			sqlite3_close(db);		
+			error_message.Format(L"Can't update database: %s\r\n", sqlite3_errmsg16(db));
+			info_edit.ReplaceSel(error_message);
+			return; 
+		}*/
+		
+
+		
 		break;
 	}
 	case 0:
@@ -1228,3 +1305,4 @@ int CG_SUB_InspectionDlg::copy_item(HTREEITEM item, int index_)
 	index_numbering(0);
 	return -1;
 }
+

@@ -22,6 +22,11 @@ public:
 
 // Overrides
 public:
+	CString Currentdir_;
+
+	HICON* icon_file;
+	CImageList icontree_list;
+
 	virtual BOOL InitInstance();
 	virtual int ExitInstance();
 

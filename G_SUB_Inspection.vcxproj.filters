@@ -39,6 +39,12 @@
     <ClInclude Include="INIParser.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="SplashWnd.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="DbSqlite.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="G_SUB_Inspection.cpp">
@@ -54,6 +60,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="INIParser.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="SplashWnd.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="DbSqlite.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -75,6 +87,9 @@
       <Filter>Resource Files</Filter>
     </Image>
     <Image Include="res\icon_plan.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="res\Eprint Banner Image.bmp">
       <Filter>Resource Files</Filter>
     </Image>
   </ItemGroup>

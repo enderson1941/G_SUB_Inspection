@@ -20,6 +20,8 @@
 #include "algorithm"
 #include "INIParser.h"
 #include "map"
+#include "DbSqlite.h"
+
 //
 #include "afxpropertygridctrl.h"
 
@@ -74,8 +76,6 @@ public:
 	double scale_index;
 	char* plan_filename = "plan.ini";
 
-	HICON* icon_file;
-	CImageList icontree_list;
 	CImageList* m_pImageList;
 	BOOL load_sgn = FALSE;
 	BOOL inquery_pswd = FALSE;
@@ -87,11 +87,14 @@ public:
 	BOOL mdy_pln = FALSE;
 	BOOL inspect_sgn = FALSE;
 	BOOL m_bIsDrag = FALSE;
+	BOOL db_access;
+	CString error_message;
 	CString model_add;
 	CString temp_str;
 	CString mdy_data;
 	CString current_date;
 	CString* treeNode_str;
+	
 	Mat paint_ = Mat(1024, 1280, CV_8UC3, Scalar::all(240));
 
 	INIParser plan_parser;
