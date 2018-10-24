@@ -142,10 +142,13 @@ int INIParser::WriteINI(char*	path)
 
 //set value
 vector<ININode>::size_type
-INIParser::SetValue(string root, string key, CString value)
+INIParser::SetValue(string root, CString key_, CString value)
 {
 	string value_;
+	string key;
 	value_ = CW2A(value.GetString());
+	USES_CONVERSION;
+	key = W2A(key_);
 	map<string, SubNode>::iterator itr = map_ini.find(root);
 	if (map_ini.end()!= itr)
 		itr->second.sub_node.insert(pair<string, string>(key, value_));

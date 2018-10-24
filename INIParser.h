@@ -41,7 +41,7 @@ public:
 	int ReadINI(char*	path);
 	CString GetValue(string root, CString key, int& size_);
 	vector<ININode>::size_type GetSize() { return map_ini.size(); }
-	vector<ININode>::size_type SetValue(string root, string key, CString value);
+	vector<ININode>::size_type SetValue(string root, CString key_, CString value);
 	int WriteINI(char*	path);
 	void Clear() { map_ini.clear(); }
 	

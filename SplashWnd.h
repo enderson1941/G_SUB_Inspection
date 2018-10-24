@@ -24,12 +24,12 @@ protected:
 public:
 	CString version_;
 	CString db_command;
-	CStdioFile  out_file;
+
 	DWORD dwRet;
 	INIParser	ini_parser;
 	HICON* icon_file;
-	/*CDbSQLite modify_db;
-	CSqlStatement* db_status;*/
+	CDbSQLite modify_db;
+	CSqlStatement* db_status;
 
 	virtual BOOL OnInitDialog();
 	afx_msg void OnTimer(UINT_PTR nIDEvent);

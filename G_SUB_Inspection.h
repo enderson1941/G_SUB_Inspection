@@ -8,6 +8,7 @@
 	#error "include 'stdafx.h' before including this file for PCH"
 #endif
 
+#include "vector"
 #include "resource.h"		// main symbols
 
 
@@ -22,7 +23,13 @@ public:
 
 // Overrides
 public:
+	char* instruction_file;
+	char* database_file;
+	char* modelList_file;
 	CString Currentdir_;
+	CString currentTime;
+	CString admin_pass[2];
+	std::vector<CString> model_;
 
 	HICON* icon_file;
 	CImageList icontree_list;

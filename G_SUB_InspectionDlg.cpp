@@ -5,20 +5,7 @@
 #include "stdafx.h"
 #include "G_SUB_Inspection.h"
 #include "G_SUB_InspectionDlg.h"
-#include "afxdialogex.h"
-#include "iostream"
-#include "CvvImage.h"
-#include "vector"
-#include "Strsafe.h"
-#include "stdio.h"
-#include "stdlib.h"
-#include "conio.h"
-#include "cstdlib"
-#include "utility"
-#include "fstream"
-#include "io.h"
-
-
+#include "SplashWnd.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -27,6 +14,7 @@
 #define IDC_crtd_EDIT 9000
 
 ClxTreeCtrl plan_tree;
+extern SplashWnd* spl_wnd;
 
 // CAboutDlg dialog used for App About
 
@@ -130,7 +118,6 @@ END_MESSAGE_MAP()
 
 
 // CG_SUB_InspectionDlg message handlers
-
 BOOL CG_SUB_InspectionDlg::OnInitDialog()
 {
 	CDialogEx::OnInitDialog();
@@ -166,34 +153,45 @@ BOOL CG_SUB_InspectionDlg::OnInitDialog()
 	//
 	functionarea_init(-1);
 
-	vector<CString> strVecAccount;
-	CString strConfigIniPath = _T("init.ini");
-	CStdioFile fileAccount;
-	if (fileAccount.Open(strConfigIniPath, CFile::typeUnicode | CFile::modeReadWrite))
+	CString strValue = L"NULL";
+	USES_CONVERSION;
+	CString strConfigIniPath =  A2T(theApp.instruction_file);
+	TCHAR szBuffer[MAX_PATH] = { 0 };
+	int nBufferSize = GetPrivateProfileSection(L"INFO", szBuffer, MAX_PATH, strConfigIniPath);
+	TCHAR szKey[MAX_PATH] = { 0 };
+	CString strKey = _T("");
+	CString strKeyName = _T("");
+	CString strKeyValue = _T("");
+	strVecAccount.clear();
+	for (int n = 0, i = 0; n < nBufferSize; n++)
 	{
-		CString strValue;
-		fileAccount.ReadString(strValue);
-		strValue.Empty();
-		while (strValue != L"D")
+		if (szBuffer[n] == 0)
 		{
-			if (!strValue.IsEmpty())
-			{
-				strVecAccount.push_back(strValue);
-				info_edit.ReplaceSel(strValue + L"\r\n");
-			}
-			strValue.Empty();
-			fileAccount.ReadString(strValue);
+			szKey[i] = 0;
+			strKey = szKey;
+			strKeyName = strKey.Left(strKey.Find('='));
+			strKeyValue = strKey.Mid(strKey.Find('=') + 1);
+			strValue.Format(strKeyName + L": " + strKeyValue + L"\r\n");
+			strVecAccount.push_back(strValue);
+			info_edit.ReplaceSel(strValue);
+			i = 0;
+		}
+		else
+		{
+			szKey[i] = szBuffer[n];
+			i++;
 		}
 	}
-	fileAccount.Close();
-	
+	strVecAccount.shrink_to_fit();
+
 	COLORREF oldColor = RGB(240, 240, 240);
 	plan_tree.SetBkColor(oldColor);
 	plan_tree.SetImageList(&theApp.icontree_list, TVSIL_NORMAL);
 
-	model_sel.AddString(L"AJ6");
-	model_sel.AddString(L"JG3");
-	model_sel.AddString(L"TAA");
+	for (int i = 0; i < theApp.model_.size(); i++)
+	{
+		model_sel.AddString(theApp.model_[i]);
+	}
 	
 	datepick.SetFormat(L"yyyy-MM-dd");
 	//repaint screen
@@ -257,6 +255,7 @@ void CG_SUB_InspectionDlg::OnBnClickedfuncbutton()
 	// TODO: Add your control notification handler code here
 	if (!inspect_sgn)
 	{
+		plan_tree.ModifyStyle(0, TVS_DISABLEDRAGDROP, 0);
 		functionarea_init(0);
 		if (add_pln || mdy_pln)
 		{
@@ -284,18 +283,20 @@ void CG_SUB_InspectionDlg::OnBnClickedfuncbutton()
 			pswd_state = FALSE;
 			inspect_sgn = TRUE;
 			Mat pa_ = imread("lena.jpg");
-			disp_image(IDC_inspec, pa_, gsub_ins, CRect(0, 0, 100, 100), -1);
+		//	disp_image(IDC_inspec, pa_, gsub_ins, CRect(0, 0, 100, 100), -1);
 		}
 		
 	}
 	else
 	{
+		plan_tree.ModifyStyle(TVS_DISABLEDRAGDROP, 0);
 		inspect_sgn = FALSE;
 		func_btn.SetWindowText(L"开始检测");
 		plan_tree.DeleteAllItems();
 		load_sgn = TRUE;
 		disp_image(IDC_inspec, paint_, gsub_ins, CRect(0, 0, 100, 100), -1);
 	}
+	pswd_state = FALSE;
 	SetDlgItemText(IDC_plan_area, L"当日生产计划");
 }
 
@@ -411,91 +412,13 @@ void CG_SUB_InspectionDlg::OnTimer(UINT_PTR nIDEvent)
 		load_sgn = TRUE;
 		disp_image(IDC_inspec, paint_, gsub_ins, CRect(0, 0, 100, 100));
 		func_btn.SetFocus();
-		//
-		CString m_szDbFile = _T("data_base/G_SUB.db");
-		CDbSQLite sqlite;
-		CString db_command;
-		BOOL fTest = sqlite.Open(m_szDbFile);
-
-		if (!fTest)
-		{
-			CString szError = _T("Could not open ");
-			szError += m_szDbFile;
-			AfxMessageBox(szError);
-			return;
-		}
-
-		fTest = sqlite.DirectStatement(_T("CREATE TABLE system_data (i_index, current_date, production_index)"));
-		/*db_command.Format(_T("INSERT INTO system_data (current_date) VALUES ('%s')"), L"2018-10-23");
-		fTest = sqlite.DirectStatement(db_command);*/
-
-		//db_command.Format(_T("UPDATE foo SET bar = '2018-10-23'"));//, currentTime
-		//fTest = sqlite.DirectStatement(db_command);
-
-
-		/*fTest = sqlite.DirectStatement(_T("CREATE TABLE foo (bar, baz, Name)"));
-
-		if (!fTest)
-		{
-			AfxMessageBox(_T("Couldn't create table foo"));
-		}*/
-
-
-
-
-		/*CDbSQLite sqlite;
-		CSqlStatement *stmt;
-
-		BOOL access_sign = sqlite.Open(theApp.Currentdir_ + _T("\\data_base\\G_SUB.db"));
-		CTime time(CTime::GetCurrentTime());
-		CString currentTime;
-		currentTime.Format(L"%04d-%02d-%02d", time.GetYear(),
-			time.GetMonth(),
-			time.GetDay());
-		CString db_command;
-		db_command.Format(_T("SELECT * FROM system WHERE i_index == %d"), 1);
-		db_st = fy_db.Statement(db_command);
-		if (db_st != NULL)
-		{
-			db_st->NextRow();
-			
-			
-		}
-
-		db_command.Format(_T("UPDATE system SET current_date = '2018-10-23'"));//, currentTime
-		access_sign = sqlite.DirectStatement(db_command);*/
-
-		/*sqlite3 *db;
-		int rc;
-		char* errmsg;
-		rc = sqlite3_open16("D:\\sub.db", &db);
-
-		if (rc) 
-		{
-			error_message.Format(L"Can't open database: %s\r\n", sqlite3_errmsg(db));
-			info_edit.ReplaceSel(error_message);
-		}
-		else 
-		{
-			info_edit.ReplaceSel(L"Opened database successfully.\r\n");
-		}
-		rc = sqlite3_exec(db, "update 'system' set 'current_date' = '2018-10-23'", NULL, NULL, &errmsg);	
-		if (rc != SQLITE_OK) 
-		{ 
-			sqlite3_close(db);		
-			error_message.Format(L"Can't update database: %s\r\n", sqlite3_errmsg16(db));
-			info_edit.ReplaceSel(error_message);
-			return; 
-		}*/
-		
-
-		
 		break;
 	}
 	case 0:
 	{
 		KillTimer(nIDEvent);
 		info_edit.SetWindowText(L"");
+		instruction_output();
 	}
 	case 1:
 	{
@@ -520,27 +443,43 @@ int CG_SUB_InspectionDlg::planlist_ini(int mode_)
 	}
 	case -1:
 	{
+		int temp_count = 0;
 		plan_tree.DeleteAllItems();
 		model_sel.GetWindowText(model_add);
+		db_command.Format(L"select count(*)  from sqlite_master where type='table' and name = '%s' ", model_add);
+		spl_wnd->db_status = spl_wnd->modify_db.Statement(db_command);
+		if (spl_wnd->db_status != NULL)
+		{
+			while (spl_wnd->db_status->NextRow())
+			{
+				temp_count = _ttoi(spl_wnd->db_status->ValueString(0));
+			}
+		}
+		delete spl_wnd->db_status;
+		if (temp_count == 0)
+		{
+			MessageBox(L"no tab");
+		}
+
 		temp_str.Format(treeNode_str[0] + L"%d", newmodel_no + 1);
 		//model name
 		hRoot = plan_tree.InsertItem(model_add, 0, 0, TVI_ROOT, TVI_LAST);
-		new_item[newmodel_no] = plan_tree.InsertItem(temp_str, 0, 0, hRoot, TVI_LAST);
+		new_item[newmodel_no] = plan_tree.InsertItem(temp_str, 1, 1, hRoot, TVI_LAST);
 		plan_tree.SetItemData(new_item[newmodel_no], 0);
 		//camera index
-		subRoot = plan_tree.InsertItem(treeNode_str[1], 0, 0, new_item[newmodel_no], TVI_LAST);
+		subRoot = plan_tree.InsertItem(treeNode_str[1], 1, 1, new_item[newmodel_no], TVI_LAST);
 		plan_tree.SetItemData(subRoot, 1);
 		//inspect content name
-		subRoot1 = plan_tree.InsertItem(treeNode_str[2], 0, 0, new_item[newmodel_no], TVI_LAST);
+		subRoot1 = plan_tree.InsertItem(treeNode_str[2], 1, 1, new_item[newmodel_no], TVI_LAST);
 		plan_tree.SetItemData(subRoot1, 2);
 		//inspect image name
-		subRoot2 = plan_tree.InsertItem(treeNode_str[3], 0, 0, new_item[newmodel_no], TVI_LAST);
+		subRoot2 = plan_tree.InsertItem(treeNode_str[3], 1, 1, new_item[newmodel_no], TVI_LAST);
 		plan_tree.SetItemData(subRoot2, 3);
 		//inspect ROI
-		subRoot3 = plan_tree.InsertItem(treeNode_str[4], 0, 0, new_item[newmodel_no], TVI_LAST);
+		subRoot3 = plan_tree.InsertItem(treeNode_str[4], 1, 1, new_item[newmodel_no], TVI_LAST);
 		plan_tree.SetItemData(subRoot3, 4);
 		//inspect threshold
-		subRoot4 = plan_tree.InsertItem(treeNode_str[5], 0, 0, new_item[newmodel_no], TVI_LAST);
+		subRoot4 = plan_tree.InsertItem(treeNode_str[5], 1, 1, new_item[newmodel_no], TVI_LAST);
 		plan_tree.SetItemData(subRoot4, 5);
 		plan_tree.Expand(hRoot, TVE_EXPAND);
 		plan_tree.Expand(new_item[newmodel_no], TVE_EXPAND);
@@ -590,10 +529,10 @@ int CG_SUB_InspectionDlg::planlist_ini(int mode_)
 		temp_str.ReleaseBuffer();
 		if (_access(file_nme, 0) == -1)
 		{
-			inquery_pln = FALSE;
 			SetTimer(0, 900, NULL);
 			info_edit.SetWindowText(L"无法查询生产计划，请确认日期正确。\
 \r\n或添加当日生产计划。");
+			hRoot = plan_tree.InsertItem(current_date, 0, 0, TVI_ROOT, TVI_LAST);
 			nReturn = - 1;
 		}
 		else
@@ -614,7 +553,6 @@ int CG_SUB_InspectionDlg::planlist_ini(int mode_)
 		temp_str.ReleaseBuffer();
 		if (_access(file_nme, 0) == -1)
 		{
-			inquery_dat = FALSE;
 			SetTimer(0, 900, NULL);
 			info_edit.SetWindowText(L"无法查询检查数据，请确认日期正确。");
 		}
@@ -644,7 +582,7 @@ void CG_SUB_InspectionDlg::OnEnChangepswd()
 	pswd_edt.GetWindowText(pswd_text);
 	if (add_md)
 	{
-		if (pswd_text == L"h")
+		if (pswd_text == theApp.admin_pass[1])
 		{
 			pswd_state = TRUE;
 			pswd_edt.SetWindowText(NULL);
@@ -654,7 +592,7 @@ void CG_SUB_InspectionDlg::OnEnChangepswd()
 	}
 	else
 	{
-		if (pswd_text == L"f")
+		if (pswd_text == theApp.admin_pass[0])
 		{
 			pswd_state = TRUE;
 			pswd_edt.SetWindowText(NULL);
@@ -721,12 +659,12 @@ void CG_SUB_InspectionDlg::OnNMRClickplan(NMHDR *pNMHDR, LRESULT *pResult)
 		MessageBox(L"请先停止当前检测。", L"异常信息", MB_ICONINFORMATION | MB_OK);
 		return;
 	}
-	if (mdy_pln == TRUE && add_md == FALSE)
+	/*if (mdy_pln == TRUE && add_md == FALSE)
 	{
 		SetTimer(-2, 900, NULL);
 		MessageBox(L"请单击“开始检测”保存当前计划。", L"提示信息", MB_ICONINFORMATION | MB_OK);
 		return;
-	}
+	}*/
 	// Load menu
 	CMenu m_Menu, *p_Menu = NULL;
 	m_Menu.LoadMenu(IDR_MENU1);
@@ -789,6 +727,7 @@ void CG_SUB_InspectionDlg::OnPlanmenu1chkpln()
 {
 	// TODO: Add your command handler code here
 	inquery_pln = TRUE;
+	inquery_dat = FALSE;
 	if (!pswd_state)
 	{
 		functionarea_init(1);
@@ -823,6 +762,7 @@ void CG_SUB_InspectionDlg::OnPlanmenu1chkdata()
 {
 	// TODO: Add your command handler code here
 	inquery_dat = TRUE;
+	inquery_pln = FALSE;
 	if (!pswd_state)
 	{
 		functionarea_init(1);
@@ -962,12 +902,7 @@ void CG_SUB_InspectionDlg::functionarea_init(int mode_)
 		pWnd = GetDlgItem(IDC_func_button);
 		pWnd->SetWindowPos(NULL, 0, 0, ori_rect.Width() + 170, ori_rect.Height(),
 			SWP_NOZORDER | SWP_NOMOVE);
-		CTime time(CTime::GetCurrentTime());
-		CString currentTime;
-		currentTime.Format(L"%04d-%02d-%02d", time.GetYear(),
-			time.GetMonth(),
-			time.GetDay());
-		current_date = currentTime;
+		current_date = theApp.currentTime;
 		break;
 	}
 	case 0:
@@ -1031,6 +966,7 @@ void CG_SUB_InspectionDlg::OnCbnSelchangemodelsel()
 	else
 	{
 		planlist_ini(1);
+		mdy_pln = FALSE;
 	}
 }
 
@@ -1306,3 +1242,13 @@ int CG_SUB_InspectionDlg::copy_item(HTREEITEM item, int index_)
 	return -1;
 }
 
+void CG_SUB_InspectionDlg::instruction_output()
+{
+	info_edit.SetWindowText(NULL);
+	for (size_t i = 0; i < strVecAccount.size(); i++)
+	{
+		info_edit.ReplaceSel(strVecAccount[i]);
+	}
+	UpdateData(FALSE);
+	info_edit.LineScroll(info_edit.GetLineCount() - 15);
+}

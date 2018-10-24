@@ -6,6 +6,18 @@
 #include "afxwin.h"
 #include "afxcmn.h"
 #include "afxdtctl.h"
+#include "afxdialogex.h"
+#include "iostream"
+#include "CvvImage.h"
+#include "vector"
+#include "Strsafe.h"
+#include "stdio.h"
+#include "stdlib.h"
+#include "conio.h"
+#include "cstdlib"
+#include "utility"
+#include "fstream"
+#include "io.h"
 
 #include "opencv2/opencv_modules.hpp"
 #include "opencv2/core/ocl.hpp"
@@ -21,7 +33,6 @@
 #include "INIParser.h"
 #include "map"
 #include "DbSqlite.h"
-
 //
 #include "afxpropertygridctrl.h"
 
@@ -93,7 +104,9 @@ public:
 	CString temp_str;
 	CString mdy_data;
 	CString current_date;
+	CString db_command;
 	CString* treeNode_str;
+	vector<CString> strVecAccount;
 	
 	Mat paint_ = Mat(1024, 1280, CV_8UC3, Scalar::all(240));
 
@@ -128,6 +141,7 @@ public:
 	void queryTreeNode(CTreeCtrl& m_tree, HTREEITEM& hTreeItem, CString appPathFile);
 	void OnKillfocusEdit();
 	void functionarea_init(int mode_);
+	void instruction_output();
 	void disp_image(UINT disp_ID, Mat dsp_img, CWnd* pt, CRect& img_rect, int cam_index = 0);
 	virtual void OnOK();
 	afx_msg void OnBnClickedfuncbutton();
