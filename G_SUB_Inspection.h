@@ -24,6 +24,7 @@ public:
 // Overrides
 public:
 	char* instruction_file;
+	char* camera_file;
 	char* database_file;
 	char* modelList_file;
 	CString Currentdir_;

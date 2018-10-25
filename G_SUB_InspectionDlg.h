@@ -18,7 +18,7 @@
 #include "utility"
 #include "fstream"
 #include "io.h"
-
+//OpenCV
 #include "opencv2/opencv_modules.hpp"
 #include "opencv2/core/ocl.hpp"
 #include "opencv2/opencv.hpp"
@@ -33,11 +33,30 @@
 #include "INIParser.h"
 #include "map"
 #include "DbSqlite.h"
-//
-#include "afxpropertygridctrl.h"
+//Basler
+#include <pylon/PylonIncludes.h>
+#ifdef PYLON_WIN_BUILD
+#    include <pylon/PylonGUI.h>
+#endif
+#include "pylon/gige/_BaslerGigECameraParams.h"
+#include "pylon/gige/BaslerGigECamera.h"
+#include "pylon/gige/BaslerGigEInstantCamera.h"
+#include "pylon/ImageEventHandler.h"
+#include "ImageEventPrinter.h"
+#include "pylon/ConfigurationEventHandler.h"
+#include "pylon/PylonIncludes.h"
+#include "pylon/FeaturePersistence.h"
+#include "pylon/ImagePersistence.h"
+#include "pylon/ImageFormatConverter.h"
+#include "pylon/GrabResultPtr.h"
 
 using namespace std;
 using namespace cv;
+using namespace Pylon;
+using namespace GenApi;
+using namespace Basler_GigECameraParams;
+
+#define MAX_CAMERA 1
 
 // CG_SUB_InspectionDlg dialog
 class CG_SUB_InspectionDlg : public CDialogEx
@@ -57,6 +76,10 @@ public:
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV support
 
+// Instant Camera Image Event.
+// This is where we are going the receive the grabbed images.
+// This method is called from the Instant Camera grab loop thread.
+	virtual void OnImageGrabbed(CInstantCamera& camera_act, const CGrabResultPtr& ptrGrabResult_act);
 
 // Implementation
 protected:
@@ -70,24 +93,38 @@ protected:
 
 	DECLARE_MESSAGE_MAP()
 public:
-
-	typedef struct inspect_data
+	typedef struct camera_data
 	{
+		int camera_index;
 		int real_inspect_number = 0;
 		int real_NG_number = 0;
+		int frame_width;
+		int frame_height;
+		int focus;
 		CString model_name;
 		BOOL inspect_sgn = FALSE;
-	}; 
-	inspect_data insp_dat;
+		VideoCapture camera;
+		Mat frame;
+		//
+		CBaslerGigEInstantCamera camera_basler;
+		CBaslerGigEImageEventHandler ImageEventHandler;
+		CBaslerGigEGrabResultPtr  m_LastGrabbedImage;
 
+		CGrabResultPtr ptrGrabResult_basler;
+		DeviceInfoList_t lstdevices_basler;
+		CLock m_lock;
+	}; 
+	camera_data* camera_dat;
+	CBaslerGigEInstantCamera camera_basler;
 	int temp_int = 0;
 	int temp_index = 0;
-	int newmodel_no = 0;
+	int newmodel_no = 1;
 	int plan_num = 0;
 	double scale_index;
 	char* plan_filename = "plan.ini";
 
 	CImageList* m_pImageList;
+	BOOL initialize_sgn = FALSE;
 	BOOL load_sgn = FALSE;
 	BOOL inquery_pswd = FALSE;
 	BOOL pswd_state = FALSE;
@@ -95,10 +132,11 @@ public:
 	BOOL inquery_dat = FALSE;
 	BOOL add_pln = FALSE;
 	BOOL add_md = FALSE;
+	BOOL add_content = FALSE;
 	BOOL mdy_pln = FALSE;
+	BOOL mdy_md = FALSE;
 	BOOL inspect_sgn = FALSE;
 	BOOL m_bIsDrag = FALSE;
-	BOOL db_access;
 	CString error_message;
 	CString model_add;
 	CString temp_str;
@@ -106,11 +144,12 @@ public:
 	CString current_date;
 	CString db_command;
 	CString* treeNode_str;
+	CString* title_str;
 	vector<CString> strVecAccount;
 	
 	Mat paint_ = Mat(1024, 1280, CV_8UC3, Scalar::all(240));
 
-	INIParser plan_parser;
+	INIParser ini_parser;
 	HTREEITEM* new_item;
 	HTREEITEM m_hDragItem;
 	HTREEITEM selected_item;
@@ -136,6 +175,8 @@ public:
 	int planlist_ini(int mode_);
 	int index_numbering(int mode_);
 	int copy_item(HTREEITEM item, int index_);
+	int database_operation(int mode_, CString content);
+	int camera_initialization();
 	void recordTreeNode(CTreeCtrl& m_tree, HTREEITEM hTreeItem,
 		UINT& fileSum, int& layer, CString appPathFile);
 	void queryTreeNode(CTreeCtrl& m_tree, HTREEITEM& hTreeItem, CString appPathFile);
@@ -143,6 +184,9 @@ public:
 	void functionarea_init(int mode_);
 	void instruction_output();
 	void disp_image(UINT disp_ID, Mat dsp_img, CWnd* pt, CRect& img_rect, int cam_index = 0);
+	void new_inspectcontent(HTREEITEM hRoot, int& newmodel_no);
+	void AutoGainContinuous(CBaslerGigEInstantCamera& camera_basler);
+	void AutoExposureContinuous(CBaslerGigEInstantCamera& camera_basler);
 	virtual void OnOK();
 	afx_msg void OnBnClickedfuncbutton();
 	afx_msg void OnTimer(UINT_PTR nIDEvent);

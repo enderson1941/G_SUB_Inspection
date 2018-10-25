@@ -210,6 +210,7 @@
     <ClInclude Include="DbSqlite.h" />
     <ClInclude Include="G_SUB_Inspection.h" />
     <ClInclude Include="G_SUB_InspectionDlg.h" />
+    <ClInclude Include="ImageEventPrinter.h" />
     <ClInclude Include="INIParser.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="SplashWnd.h" />

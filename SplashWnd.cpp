@@ -8,6 +8,7 @@
 #include "afxdialogex.h"
 
 SplashWnd* spl_wnd;
+extern CG_SUB_InspectionDlg* gsub_ins;
 
 // SplashWnd dialog
 
@@ -17,6 +18,7 @@ SplashWnd::SplashWnd(CWnd* pParent /*=NULL*/)
 	: CDialogEx(IDD_SplashWnd, pParent)
 {
 	theApp.instruction_file = "temp\\instruction.ini";
+	theApp.camera_file = "temp\\camera.ini";
 	theApp.modelList_file = "temp\\modelList.ini";
 	theApp.database_file = "database\\G_SUB.db";
 }
@@ -30,11 +32,9 @@ void SplashWnd::DoDataExchange(CDataExchange* pDX)
 	CDialogEx::DoDataExchange(pDX);
 }
 
-
 BEGIN_MESSAGE_MAP(SplashWnd, CDialogEx)
 	ON_WM_TIMER()
 END_MESSAGE_MAP()
-
 
 // SplashWnd message handlers
 BOOL SplashWnd::OnInitDialog()
@@ -68,6 +68,10 @@ BOOL SplashWnd::OnInitDialog()
 	if (!PathIsDirectory(L"temp\\plan"))
 	{
 		::CreateDirectory(L"temp\\plan", NULL);
+	}
+	if (!PathIsDirectory(L"model"))
+	{
+		::CreateDirectory(L"model", NULL);
 	}
 #pragma endregion
 	version_.LoadString(IDS_version);
@@ -145,9 +149,32 @@ BOOL SplashWnd::OnInitDialog()
 		//
 		ini_parser.Clear();
 	}
+	//
+	appPathFile.Format(A2T(theApp.camera_file));
+	if (_access(theApp.camera_file, 0) == -1)
+	{
+		fp = _wfopen(appPathFile, _T("wb"));
+		fwrite(&sUnicodeFlag, sizeof(short int), 1, fp);
+		fclose(fp);
+		_str.Format(L"1920");
+		ini_parser.SetValue("Web Camera", L"frame_width", _str);
+		_str.Format(L"1080");
+		ini_parser.SetValue("Web Camera", L"frame_height", _str);
+		_str.Format(L"15");
+		ini_parser.SetValue("Web Camera", L"focus", _str);
+		//
+		_str.Format(L"1920");
+		ini_parser.SetValue("Basler Camera", L"frame_width", _str);
+		_str.Format(L"1080");
+		ini_parser.SetValue("Basler Camera", L"frame_height", _str);
+		//
+		ini_parser.WriteINI(theApp.camera_file);
+		ini_parser.Clear();
+		_str.Format(L"%d", 3);
+		WritePrivateProfileString(L"INFO", L"camerasum", _str, appPathFile);
+	}
 	delete fp;
 	CTime time(CTime::GetCurrentTime());
-	
 	theApp.currentTime.Format(L"%04d-%02d-%02d", time.GetYear(),
 		time.GetMonth(),
 		time.GetDay());
@@ -155,47 +182,16 @@ BOOL SplashWnd::OnInitDialog()
 	if (_access(theApp.database_file, 0) == -1)
 	{
 		access_sign = modify_db.Open(A2T(theApp.database_file));
-
-		db_command.Format(L"CREATE TABLE '%s' ( \r\n 'i_index' TEXT, \r\n 'current_date' TEXT, \r\n \
-			'production_index' TEXT, \r\n 'production_in'	TEXT, \r\n 'production_realtime' TEXT, \r\n 'production_NG' TEXT, \r\n \
-'admin_pass1' TEXT, \r\n 'admin_pass2'	TEXT)", L"system_data");//IF NOT EXISTS
-		access_sign = modify_db.DirectStatement(db_command);
-		if (!access_sign)
-		{
-			SendMessage(WM_CLOSE);
-			return FALSE;
-		}
+		gsub_ins->database_operation(-4, L"");
 		//
-		db_command.Format(_T("INSERT INTO '%s' VALUES ( %d, '%s', %d, '%s', %d, %d, '%s', '%s')  "),
-			L"system_data", 1, theApp.currentTime, 0, L"NULL", 0, 0, L"f", L"h");
-		access_sign = modify_db.DirectStatement(db_command);
-		if (!access_sign)
-		{
-			return FALSE;
-		}
+		gsub_ins->database_operation(-3, theApp.currentTime);
 	}
 	else
 	{
 		access_sign = modify_db.Open(A2T(theApp.database_file));
-		db_command.Format(L"UPDATE system_data SET current_date = '%s' ", theApp.currentTime);
-		access_sign = modify_db.DirectStatement(db_command);
-		if (!access_sign)
-		{
-			SendMessage(WM_CLOSE);
-			return FALSE;
-		}
+		gsub_ins->database_operation(-2, theApp.currentTime);
 	}
-	db_command.Format(L"SELECT admin_pass1, admin_pass2 FROM system_data");
-	db_status = modify_db.Statement(db_command);
-	if (db_status != NULL)
-	{
-		while (db_status->NextRow())
-		{
-			theApp.admin_pass[0] = db_status->ValueString(0);
-			theApp.admin_pass[1] = db_status->ValueString(1);
-		}
-	}
-	delete db_status;
+	gsub_ins->database_operation(-1, L"");
 
 	SetTimer(0, 2500, NULL);
 	return TRUE;  // return TRUE unless you set the focus to a control
