@@ -56,7 +56,7 @@ BOOL CG_SUB_InspectionApp::InitInstance()
 	InitCommonControlsEx(&InitCtrls);
 
 	CWinApp::InitInstance();
-
+	PylonInitialize();
 
 	// Initialize OLE libraries
 	if (!AfxOleInit())
@@ -144,7 +144,20 @@ BOOL CG_SUB_InspectionApp::InitInstance()
 
 int CG_SUB_InspectionApp::ExitInstance()
 {
-	AfxOleTerm(FALSE);
+	AfxEnableMemoryTracking(false);
+	try
+	{
+		PylonTerminate();
+	}
+	catch (...)
+	{
+		PylonTerminate();
+		ExitProcess(0);
+	}
+	ExitProcess(0);
+	// Add this code in Destruction function
+
+	PylonTerminate();
 
 	return CWinApp::ExitInstance();
 }

@@ -115,6 +115,8 @@ BEGIN_MESSAGE_MAP(CG_SUB_InspectionDlg, CDialogEx)
 	ON_WM_LBUTTONDOWN()
 	ON_WM_LBUTTONUP()
 	ON_WM_MOUSEMOVE()
+	ON_WM_CLOSE()
+	ON_WM_RBUTTONDOWN()
 END_MESSAGE_MAP()
 
 // CG_SUB_InspectionDlg message handlers
@@ -150,14 +152,12 @@ BOOL CG_SUB_InspectionDlg::OnInitDialog()
 	// TODO: Add extra initialization here
 	gsub_ins = this;
 	CenterWindow();
-
-	//camera initialization
-	camera_initialization();
-
 	//
 	functionarea_init(-1);
 	instruction_output();
 	initialize_sgn = TRUE;
+	//camera initialization
+	camera_initialization();
 
 	COLORREF oldColor = RGB(240, 240, 240);
 	plan_tree.SetBkColor(oldColor);
@@ -167,6 +167,10 @@ BOOL CG_SUB_InspectionDlg::OnInitDialog()
 	{
 		model_sel.AddString(theApp.model_[i]);
 	}
+
+	m_RectTracker.m_nStyle = CRectTracker::resizeOutside | CRectTracker::hatchedBorder;
+	m_RectTracker.m_nHandleSize = 6;
+	m_RectTracker.m_rect.SetRect(0, 0, 0, 0);
 
 	//repaint screen
 	SetTimer(-1, 10, NULL);
@@ -191,9 +195,9 @@ void CG_SUB_InspectionDlg::OnSysCommand(UINT nID, LPARAM lParam)
 //  this is automatically done for you by the framework.
 void CG_SUB_InspectionDlg::OnPaint()
 {
+	CPaintDC dc(this); // device context for painting
 	if (IsIconic())
 	{
-		CPaintDC dc(this); // device context for painting
 
 		SendMessage(WM_ICONERASEBKGND, reinterpret_cast<WPARAM>(dc.GetSafeHdc()), 0);
 
@@ -210,6 +214,10 @@ void CG_SUB_InspectionDlg::OnPaint()
 	}
 	else
 	{
+		if (m_RectTracker.m_rect.Height())//IsRectEmpty()
+		{
+			m_RectTracker.Draw(&dc);
+		}
 		CDialogEx::OnPaint();
 	}
 	
@@ -257,6 +265,13 @@ void CG_SUB_InspectionDlg::OnBnClickedfuncbutton()
 			inspect_sgn = TRUE;
 			Mat pa_ = imread("lena.jpg");
 		//	disp_image(IDC_inspec, pa_, gsub_ins, CRect(0, 0, 100, 100), -1);
+			
+			cam_basler.StopGrabbing();
+			cam_basler.TriggerMode.SetValue(TriggerMode_On);
+			cam_basler.TriggerActivation.SetValue(TriggerActivation_FallingEdge);
+			cam_basler.TriggerDelay.SetValue(635000);//635000
+			Sleep(100);
+			cam_basler.StartGrabbing(GrabStrategy_OneByOne, GrabLoop_ProvidedByInstantCamera);
 		}
 		
 	}
@@ -266,6 +281,7 @@ void CG_SUB_InspectionDlg::OnBnClickedfuncbutton()
 		inspect_sgn = FALSE;
 		func_btn.SetWindowText(L"开始检测");
 		plan_tree.DeleteAllItems();
+		cam_basler.StopGrabbing();
 		load_sgn = TRUE;
 		disp_image(IDC_inspec, paint_, gsub_ins, CRect(0, 0, 100, 100), -1);
 	}
@@ -351,6 +367,7 @@ void CG_SUB_InspectionDlg::disp_image(UINT disp_ID, Mat dsp_img, CWnd* pt,
 	cimg.CopyOf(&cpy);
 	cimg.DrawToHDC(hDC, &img_rect);
 	pt->ReleaseDC(_pDC);
+	disp_rect = img_rect;
 }
 
 //Timer Ctrl
@@ -400,8 +417,22 @@ void CG_SUB_InspectionDlg::OnTimer(UINT_PTR nIDEvent)
 	}
 	case 1:
 	{
-		camera_dat[0].camera >> camera_dat[0].frame;
-	//	disp_image(IDC_inspec, camera_dat[0].frame, gsub_ins, CRect(0, 0, 100, 100), -1);
+		for (int i = 0; i < MAX_CAMERA; i++)
+		{
+			camera_dat[0].cam_web >> camera_dat[0].frame;
+		}
+	//	disp_image(IDC_inspec, camera_dat[0].frame, gsub_ins, CRect(0, 0, 100, 100), 0);
+		break;
+	}
+	case 2:
+	{
+		KillTimer(nIDEvent);
+		HWND hWnd = ::FindWindow(NULL, L"提示信息");
+		if (hWnd)
+		{
+			keybd_event(13, 0, 0, 0);
+		}
+		
 		break;
 	}
 	default:
@@ -439,6 +470,11 @@ void CG_SUB_InspectionDlg::OnEnChangepswd()
 			if (add_pln)
 			{
 				functionarea_init(2);
+				int op = planlist_ini(2);
+				if (op == -1)
+				{
+					plan_num = 1;
+				}
 			}
 			else if (inquery_pln || inquery_dat)
 			{
@@ -742,8 +778,37 @@ void CG_SUB_InspectionDlg::OnKillfocusEdit()
 		tmp_node = temp_str.Mid(0, size_);
 	}
 	plan_tree.SetItemText(selected_item, tmp_node + L": " + mdy_data);
-	database_operation(3, mdy_data);
+	if (mdy_md)
+	{
+		if (tmp_node == L"图像名称")
+		{
+			mdy_data = L"model\\" + model_add + L"\\" + mdy_data;
+		}
+		database_operation(3, mdy_data);
+	}
+	if (tmp_node == L"相机编号")
+	{
+		int index_ = _ttoi(mdy_data);
+		if (index_ < 2)
+		{
+			disp_image(IDC_inspec, camera_dat[index_].frame, gsub_ins, CRect(0, 0, 100, 100), -1);
+			target_image = camera_dat[index_].frame.clone();
+		}
+		else
+		{
+			disp_image(IDC_inspec, basler_frame, gsub_ins, CRect(0, 0, 100, 100), -1);
+			target_image = basler_frame.clone();
+		}
+		clip_sgn = TRUE;
+	}
+	else
+	{
+		load_sgn = TRUE;
+		clip_sgn = FALSE;
+		disp_image(IDC_inspec, paint_, gsub_ins, CRect(0, 0, 100, 100), -1);
+	}
 	m_Edit.DestroyWindow();
+	mdy_pln = FALSE;
 }
 
 #pragma region Mouse Operation
@@ -751,8 +816,77 @@ void CG_SUB_InspectionDlg::OnKillfocusEdit()
 void CG_SUB_InspectionDlg::OnLButtonDown(UINT nFlags, CPoint point)
 {
 	// TODO: Add your message handler code here and/or call default
+	CPoint cur_pos;
+	CPoint start_point;
+	start_point = point;
+	CRect cwrect;
+	CRect clip_rect;
+	clip_rect = disp_rect;
+	clip_rect.TopLeft().x += 23;
+	clip_rect.TopLeft().y += 40;
+	clip_rect.BottomRight().x += 23;
+	clip_rect.BottomRight().y += 40;
+	start_point.x -= clip_rect.TopLeft().x;
+	start_point.y -= clip_rect.TopLeft().y;
+
+	GetCursorPos(&cur_pos);
+	ClientToScreen(clip_rect);
+	if (clip_rect.PtInRect(cur_pos) && clip_sgn)//cur_pos
+	{
+		ClipCursor(clip_rect);
+		if (m_RectTracker.HitTest(point)<0)
+		{
+			m_RectTracker.TrackRubberBand(this, point, TRUE);
+		}
+		else
+		{
+			m_RectTracker.Track(this, point, TRUE);
+		}
+		m_RectTracker.m_rect.NormalizeRect();
+		cut_rect.x = start_point.x * scale_index;
+		cut_rect.y = start_point.y * scale_index;
+		cut_rect.width = m_RectTracker.m_rect.Width() *  scale_index;
+		cut_rect.height = m_RectTracker.m_rect.Height() *  scale_index;
+
+		temp_str.Format(L"Start Point(%d, %d)\r\nClip Rect(width: %d, height: %d)",
+			cut_rect.x, cut_rect.y, cut_rect.width, cut_rect.height);
+		info_edit.SetWindowText(temp_str);
+
+		inspec_pic.GetWindowRect(&cwrect);
+		ScreenToClient(cwrect);
+	//	InvalidateRect(&cwrect, TRUE);
+	}
 
 	CDialogEx::OnLButtonDown(nFlags, point);
+}
+
+//Right ButtonDown
+void CG_SUB_InspectionDlg::OnRButtonDown(UINT nFlags, CPoint point)
+{
+	// TODO: Add your message handler code here and/or call default
+	if (clip_sgn)
+	{
+		ClipCursor(NULL);
+		clip_sgn = FALSE;
+		USES_CONVERSION;
+		temp_str = plan_tree.GetItemText(subRoot2);
+		temp_int = temp_str.ReverseFind(':');
+		if (temp_int == -1)
+		{
+
+		}
+		else
+		{
+			temp_str = temp_str.Mid(temp_int + 2);
+			temp_str = L"model\\" + model_add + L"\\" + temp_str;
+			temp_filename = T2A(temp_str.GetBuffer(0));
+			temp_str.ReleaseBuffer();
+		}
+		Mat clip_image = target_image(cut_rect);
+		imwrite(temp_filename, clip_image);
+
+	}
+	CDialogEx::OnRButtonDown(nFlags, point);
 }
 
 //Left ButtonUp
@@ -869,6 +1003,25 @@ void CG_SUB_InspectionDlg::instruction_output()
 		info_edit.LineScroll(info_edit.GetLineCount() - 15);
 	}
 }
+
+void CG_SUB_InspectionDlg::OnClose()
+{
+	// TODO: Add your message handler code here and/or call default
+	KillTimer(1);
+	for (int i = 0; i < MAX_CAMERA; i++)
+	{
+		camera_dat[i].cam_web.release();
+	}
+	cam_basler.StopGrabbing();
+	delete[] camera_dat;
+	CDialogEx::OnCancel();
+}
+
+void CG_SUB_InspectionDlg::OnCancel()
+{
+	// TODO: Add your specialized code here and/or call the base class
+	OnClose();
+}
 #pragma endregion
 
 #pragma region TreeCtrl
@@ -894,6 +1047,10 @@ int CG_SUB_InspectionDlg::planlist_ini(int mode_)
 	{
 		plan_tree.DeleteAllItems();
 		model_sel.GetWindowText(model_add);
+		if (!PathIsDirectory(L"model\\"+ model_add))
+		{
+			::CreateDirectory(L"model\\" + model_add, NULL);
+		}
 		//model name
 		hRoot = plan_tree.InsertItem(model_add, 0, 0, TVI_ROOT, TVI_LAST);
 		database_operation(0, model_add);
@@ -918,9 +1075,8 @@ int CG_SUB_InspectionDlg::planlist_ini(int mode_)
 	}
 	case 1://add
 	{
-		plan_num++;
 		model_sel.GetWindowText(model_add);
-		if (plan_tree.GetItemText(hRoot) == L"")
+		if (plan_tree.GetItemText(hRoot) != current_date)
 		{
 			hRoot = plan_tree.InsertItem(current_date, 0, 0, TVI_ROOT, TVI_LAST);
 		}
@@ -1099,6 +1255,10 @@ void CG_SUB_InspectionDlg::OnNMRClickplan(NMHDR *pNMHDR, LRESULT *pResult)
 void CG_SUB_InspectionDlg::OnPlanmenu1addpln()
 {
 	// TODO: Add your command handler code here
+	if (add_md || add_content || mdy_pln || mdy_md)
+	{
+		return;
+	}
 	add_pln = TRUE;
 	delete[] treeNode_str;
 	treeNode_str = new CString[3];
@@ -1274,15 +1434,22 @@ void CG_SUB_InspectionDlg::OnPlanmenu2modpln()
 	mdy_pln = TRUE;
 	m_Edit.Create(ES_AUTOHSCROLL | WS_CHILD | ES_LEFT | ES_WANTRETURN,
 		CRect(0, 0, 0, 0), this, IDC_crtd_EDIT);
-
+	CString contents_reserved;
 	m_Edit.SetFont(this->GetFont(), FALSE);
 	m_Edit.SetParent(&plan_tree);
 	CRect  EditRect;
 	plan_tree.GetItemRect(selected_item, EditRect, TRUE);
+	contents_reserved = plan_tree.GetItemText(selected_item);
+	int index = contents_reserved.ReverseFind(':');
+	if (index != -1)
+	{
+		contents_reserved = contents_reserved.Mid(index + 2);
+	}
 	EditRect.SetRect(EditRect.left + EditRect.Width() + 10, EditRect.top + 1,
 		EditRect.right + EditRect.Width() + 10, EditRect.bottom - 1);
 
 	m_Edit.MoveWindow(&EditRect);
+	m_Edit.SetWindowText(contents_reserved);
 	m_Edit.ShowWindow(SW_SHOW);
 	m_Edit.SetFocus();
 	m_Edit.SetSel(-1);
@@ -1469,31 +1636,42 @@ void CG_SUB_InspectionDlg::new_inspectcontent(HTREEITEM hRoot, int& newmodel_no)
 int CG_SUB_InspectionDlg::camera_initialization()
 {
 	int nReturn = 0;
-	//WEB Camera
-	camera_dat = new camera_data[2];
+	/*WEB Camera*/
+	camera_dat = new camera_data[MAX_CAMERA];
 	int op_code = ini_parser.ReadINI(theApp.camera_file);
 	int size_ = 0;
+	temp_str = ini_parser.GetValue("Camera", L"frame_width", size_);
+	frame_width = _ttoi(temp_str);
+	temp_str = ini_parser.GetValue("Camera", L"frame_height", size_);
+	frame_height = _ttoi(temp_str);
 	for (int i = 0; i < MAX_CAMERA; i++)
 	{
 		camera_dat[i].camera_index = i;
-		temp_str = ini_parser.GetValue("Web Camera", L"frame_width", size_);
-		camera_dat[i].frame_width = _ttoi(temp_str);
-		temp_str = ini_parser.GetValue("Web Camera", L"frame_height", size_);
-		camera_dat[i].frame_height = _ttoi(temp_str);
-		temp_str = ini_parser.GetValue("Web Camera", L"focus", size_);
+		temp_str = ini_parser.GetValue("Camera", L"focus", size_);
 		camera_dat[i].focus = _ttoi(temp_str);
-		camera_dat[i].camera.open(i);
-		camera_dat[i].camera.set(CAP_PROP_FRAME_WIDTH, camera_dat[i].frame_width);
-		camera_dat[i].camera.set(CAP_PROP_FRAME_HEIGHT, camera_dat[i].frame_height);
-		camera_dat[i].camera.set(CAP_PROP_FOCUS, camera_dat[i].focus);
+		camera_dat[i].cameraOpen_sgn = camera_dat[i].cam_web.open(i);
+		if (camera_dat[i].cam_web.isOpened())
+		{
+			camera_dat[i].cam_web.set(CAP_PROP_FRAME_WIDTH, frame_width);
+			camera_dat[i].cam_web.set(CAP_PROP_FRAME_HEIGHT, frame_height);
+			camera_dat[i].cam_web.set(CAP_PROP_FOCUS, camera_dat[i].focus);
+		}
+		else
+		{
+			if (MessageBox(L"USB相机连接异常，单击确认键等待程序退出后，检查相机电源是否松动，并重启程序。", L"设备连接异常", MB_OK | MB_ICONERROR) == IDOK)
+			{
+				SetTimer(-2, 600, NULL);
+				MessageBox(L"正在退出程序，请等待...", L"设备连接异常", MB_OK | MB_ICONWARNING);
+			}
+		}
 	}
-
-
+	/*Basler Camera*/
+	// Get the transport layer factory.
 	CTlFactory& TlFactory = CTlFactory::GetInstance();
-	TlFactory.EnumerateDevices(camera_dat[2].lstdevices_basler);
-	if (camera_dat[2].lstdevices_basler.empty())
+	if (TlFactory.EnumerateDevices(devices_list) == 0)
 	{
-		if (MessageBox(L"Basler相机连接异常，单击确认键等待程序退出后，检查相机电源是否松动，并重启程序。", L"设备连接异常", MB_OK | MB_ICONERROR) == IDOK)
+		if (MessageBox(L"Basler相机连接异常，单击确认键等待程序退出后，\
+			检查相机电源是否松动，并重启程序。", L"设备连接异常", MB_OK | MB_ICONERROR) == IDOK)
 		{
 			SetTimer(-2, 600, NULL);
 			MessageBox(L"正在退出程序，请等待...", L"设备连接异常", MB_OK | MB_ICONWARNING);
@@ -1503,39 +1681,27 @@ int CG_SUB_InspectionDlg::camera_initialization()
 	}
 	else
 	{
-		camera_dat[2].camera_basler.RegisterConfiguration(new CAcquireContinuousConfiguration, RegistrationMode_ReplaceAll, Ownership_TakeOwnership);
+		cam_basler.Attach(TlFactory.CreateDevice(devices_list[0]));
+		cam_basler.RegisterConfiguration(new CAcquireContinuousConfiguration, RegistrationMode_ReplaceAll, Ownership_TakeOwnership);
+		cam_basler.RegisterImageEventHandler(this, RegistrationMode_Append, Ownership_ExternalOwnership);
+		
+		cam_basler.Open();
+		cam_basler.AcquisitionMode.SetValue(AcquisitionMode_Continuous);
+		// Carry out luminance control by using the "continuous" gain auto function.
+		AutoGainContinuous(cam_basler);
+		// Carry out luminance control by using the "continuous" exposure auto function.
+		AutoExposureContinuous(cam_basler);
+		cam_basler.TriggerSource.SetValue(TriggerSource_Software);
+		cam_basler.TriggerMode.SetValue(TriggerMode_Off);
+		converter.OutputPixelFormat = PixelType_Mono8;
+		cam_basler.Width.SetValue(frame_width);
+		cam_basler.Height.SetValue(frame_height);
+		
+		cam_basler.StartGrabbing(GrabStrategy_OneByOne, GrabLoop_ProvidedByInstantCamera);
+		SetTimer(2, 2000, NULL);
+		MessageBox(L"相机初始化中，请稍后...", L"提示信息", MB_ICONINFORMATION | MB_OK);
 
-//		HICON _hIcon = NULL;
-//		_hIcon = AfxGetApp()->LoadIcon(IDI_ICON77);
-//		cam_indi_[2].SetIcon(_hIcon);
-//		camera_act.Attach(CTlFactory::GetInstance().CreateFirstDevice());
-//		camera_act.Open();
-//		//camera_act.GetTLParams().HeartbeatTimeout.SetValue(9000);
-//		camera_act.AcquisitionMode.SetValue(AcquisitionMode_Continuous);
-//		CString cam_nam;
-//		cam_nam = camera_act.GetDeviceInfo().GetModelName();
-//		SetDlgItemText(IDC_caminuse, cam_nam);
-//		SetTimer(1, 500, NULL);
-//		MessageBox(L"相机连接成功", L"设备初始化");
-//		// Carry out luminance control by using the "continuous" gain auto function.
-//		AutoGainContinuous1(camera_act);
-//		// Carry out luminance control by using the "continuous" exposure auto function.
-//		AutoExposureContinuous1(camera_act);
-//#pragma region Camera Initialization
-//		SetTimer(1, 1000, NULL);
-//		MessageBox(L"相机初始中，请等待...", L"设备初始化");
-//		Sleep(500);
-//		camera_act.TriggerMode.SetValue(TriggerMode_Off);
-//		ShotImage(camera_act, m_StopWatch1);
-//		long mclk = 0;
-//		while (mclk<58000)
-//		{
-//			for (int i = 0; i < 10; i++)
-//			{
-//				mclk++;
-//			}
-//		}
-//		camera_act.StopGrabbing();
+	
 //		camera_act.AcquisitionMode.SetValue(AcquisitionMode_Continuous);
 //		camera_act.TriggerSelector.SetValue(TriggerSelector_FrameStart);
 //		camera_act.TriggerMode.SetValue(TriggerMode_On);
@@ -1551,23 +1717,21 @@ int CG_SUB_InspectionDlg::camera_initialization()
 //		MessageBox(L"相机已初始化完毕。", L"设备初始化");
 //		tmp_.Format(L"Basler相机已成功打开，请等待检测开始。");
 //		SetDlgItemText(IDC_instxt, tmp_);
-#pragma endregion
+//#pragma endregion
 	}
-#pragma endregion
+//#pragma endregion
 
 	ini_parser.Clear();
-//	SetTimer(1, 500, NULL);
+	SetTimer(1, 500, NULL);
 	return nReturn;
 }
 
-
-// void AutoGainContinuous(Camera_t& camera)
-void CG_SUB_InspectionDlg::AutoGainContinuous(CBaslerGigEInstantCamera& camera_basler)
+// void AutoGainContinuous
+void CG_SUB_InspectionDlg::AutoGainContinuous(Camera_basler& camera_basler)
 {
 	// Check whether the Gain Auto feature is available.
 	if (!IsWritable(camera_basler.GainAuto))
 	{
-		cout << "The camera does not support Gain Auto." << endl << endl;
 		return;
 	}
 	// Maximize the grabbed image area of interest (Image AOI).
@@ -1585,55 +1749,48 @@ void CG_SUB_InspectionDlg::AutoGainContinuous(CBaslerGigEInstantCamera& camera_b
 	// Set the Auto Function AOI for luminance statistics.
 	// Currently, AutoFunctionAOISelector_AOI1 is predefined to gather
 	// luminance statistics.
-	camera_basler.AutoFunctionAOISelector.SetValue(AutoFunctionAOISelector_AOI1);
+
+	/*camera_basler.AutoFunctionAOISelector.SetValue(AutoFunctionAOISelector_AOI1);
 	camera_basler.AutoFunctionAOIOffsetX.SetValue(0);
 	camera_basler.AutoFunctionAOIOffsetY.SetValue(0);
 	camera_basler.AutoFunctionAOIWidth.SetValue(camera_basler.Width.GetMax());
-	camera_basler.AutoFunctionAOIHeight.SetValue(camera_basler.Height.GetMax());
+	camera_basler.AutoFunctionAOIHeight.SetValue(camera_basler.Height.GetMax());*/
+	if (IsAvailable(camera_basler.AutoFunctionROISelector))
+	{
+		// Set the Auto Function ROI for luminance statistics.
+		// We want to use ROI1 for gathering the statistics.
+		if (IsWritable(camera_basler.AutoFunctionROIUseBrightness))
+		{
+			camera_basler.AutoFunctionROISelector.SetValue(AutoFunctionROISelector_ROI1);
+			camera_basler.AutoFunctionROIUseBrightness.SetValue(true);   // ROI 1 is used for brightness control
+			camera_basler.AutoFunctionROISelector.SetValue(AutoFunctionROISelector_ROI2);
+			camera_basler.AutoFunctionROIUseBrightness.SetValue(false);   // ROI 2 is not used for brightness control
+		}
+
+		// Set the ROI (in this example the complete sensor is used)
+		camera_basler.AutoFunctionROISelector.SetValue(AutoFunctionROISelector_ROI1);  // configure ROI 1
+		camera_basler.AutoFunctionROIOffsetX.SetValue(0);
+		camera_basler.AutoFunctionROIOffsetY.SetValue(0);
+		camera_basler.AutoFunctionROIWidth.SetValue(camera_basler.Width.GetMax());
+		camera_basler.AutoFunctionROIHeight.SetValue(camera_basler.Height.GetMax());
+	}
 
 	// Set the target value for luminance control. The value is always expressed
 	// as an 8 bit value regardless of the current pixel data output format,
 	// i.e., 0 -> black, 255 -> white.
-	camera_basler.AutoTargetValue.SetValue(80);
-
-	// We are trying GainAuto = Continuous.
-	cout << "Trying 'GainAuto = Continuous'." << endl;
-	cout << "Initial Gain = " << camera_basler.GainRaw.GetValue() << endl;
-
+	//camera_basler.AutoTargetValue.SetValue(80);
+	camera_basler.AutoTargetBrightness.SetValue(0.3);
 	camera_basler.GainAuto.SetValue(GainAuto_Continuous);
-
-	// When "continuous" mode is selected, the parameter value is adjusted repeatedly while images are acquired.
-	// Depending on the current frame rate, the automatic adjustments will usually be carried out for
-	// every or every other image unless the camera�s micro controller is kept busy by other tasks.
-	// The repeated automatic adjustment will proceed until the "once" mode of operation is used or
-	// until the auto function is set to "off", in which case the parameter value resulting from the latest
-	// automatic adjustment will operate unless the value is manually adjusted.
-	//	for (int n = 0; n < 20; n++)            // For demonstration purposes, we will grab "only" 20 images.
-	//	{
-	//		GrabResultPtr_t ptrGrabResult;
-	//		camera.GrabOne(5000, ptrGrabResult);
-	//#ifdef PYLON_WIN_BUILD
-	//		Pylon::DisplayImage(1, ptrGrabResult);
-	//#endif
-	//
-	//		//For demonstration purposes only. Wait until the image is shown.
-	//		WaitObject::Sleep(100);
-	//	}
-	//	camera1.GainAuto.SetValue(GainAuto_Off); // Switch off GainAuto.
-	//
-	//	cout << "Final Gain = " << camera1.GainRaw.GetValue() << endl << endl;
 }
 
-// void AutoExposureContinuous(Camera_t& camera)
-void CG_SUB_InspectionDlg::AutoExposureContinuous(CBaslerGigEInstantCamera& camera_basler)
+// void AutoExposureContinuous
+void CG_SUB_InspectionDlg::AutoExposureContinuous(Camera_basler& camera_basler)
 {
 	// Check whether the Exposure Auto feature is available.
 	if (!IsWritable(camera_basler.ExposureAuto))
 	{
-		cout << "The camera does not support Exposure Auto." << endl << endl;
 		return;
 	}
-
 	// Maximize the grabbed area of interest (Image AOI).
 	if (IsWritable(camera_basler.OffsetX))
 	{
@@ -1649,50 +1806,63 @@ void CG_SUB_InspectionDlg::AutoExposureContinuous(CBaslerGigEInstantCamera& came
 	// Set the Auto Function AOI for luminance statistics.
 	// Currently, AutoFunctionAOISelector_AOI1 is predefined to gather
 	// luminance statistics.
-	camera_basler.AutoFunctionAOISelector.SetValue(AutoFunctionAOISelector_AOI1);
+
+	/*camera_basler.AutoFunctionAOISelector.SetValue(AutoFunctionAOISelector_AOI1);
 	camera_basler.AutoFunctionAOIOffsetX.SetValue(0);
 	camera_basler.AutoFunctionAOIOffsetY.SetValue(0);
 	camera_basler.AutoFunctionAOIWidth.SetValue(camera_basler.Width.GetMax());
-	camera_basler.AutoFunctionAOIHeight.SetValue(camera_basler.Height.GetMax());
+	camera_basler.AutoFunctionAOIHeight.SetValue(camera_basler.Height.GetMax());*/
+	if (IsAvailable(camera_basler.AutoFunctionROISelector))
+	{
+		// Set the Auto Function ROI for luminance statistics.
+		// We want to use ROI1 for gathering the statistics.
+		if (IsWritable(camera_basler.AutoFunctionROIUseBrightness))
+		{
+			camera_basler.AutoFunctionROISelector.SetValue(AutoFunctionROISelector_ROI1);
+			camera_basler.AutoFunctionROIUseBrightness.SetValue(true);   // ROI 1 is used for brightness control
+			camera_basler.AutoFunctionROISelector.SetValue(AutoFunctionROISelector_ROI2);
+			camera_basler.AutoFunctionROIUseBrightness.SetValue(false);   // ROI 2 is not used for brightness control
+		}
+
+		// Set the ROI (in this example the complete sensor is used)
+		camera_basler.AutoFunctionROISelector.SetValue(AutoFunctionROISelector_ROI1);  // configure ROI 1
+		camera_basler.AutoFunctionROIOffsetX.SetValue(0);
+		camera_basler.AutoFunctionROIOffsetY.SetValue(0);
+		camera_basler.AutoFunctionROIWidth.SetValue(camera_basler.Width.GetMax());
+		camera_basler.AutoFunctionROIHeight.SetValue(camera_basler.Height.GetMax());
+	}
 
 	// Set the target value for luminance control. The value is always expressed
 	// as an 8 bit value regardless of the current pixel data output format,
 	// i.e., 0 -> black, 255 -> white.
-	camera_basler.AutoTargetValue.SetValue(80);
-
-	cout << "ExposureAuto 'GainAuto = Continuous'." << endl;
-	cout << "Initial exposure time = ";
-	cout << camera_basler.ExposureTimeAbs.GetValue() << " us" << endl;
-
+	//camera_basler.AutoTargetValue.SetValue(80);
+	camera_basler.AutoTargetBrightness.SetValue(0.3);
 	camera_basler.ExposureAuto.SetValue(ExposureAuto_Continuous);
-
-	// When "continuous" mode is selected, the parameter value is adjusted repeatedly while images are acquired.
-	// Depending on the current frame rate, the automatic adjustments will usually be carried out for
-	// every or every other image, unless the camera�s microcontroller is kept busy by other tasks.
-	// The repeated automatic adjustment will proceed until the "once" mode of operation is used or
-	// until the auto function is set to "off", in which case the parameter value resulting from the latest
-	// automatic adjustment will operate unless the value is manually adjusted.
-	//	for (int n = 0; n < 20; n++)    // For demonstration purposes, we will use only 20 images.
-	//	{
-	//		GrabResultPtr_t ptrGrabResult;
-	//		camera.GrabOne(5000, ptrGrabResult);
-	//#ifdef PYLON_WIN_BUILD
-	//		Pylon::DisplayImage(1, ptrGrabResult);
-	//#endif
-	//
-	//		//For demonstration purposes only. Wait until the image is shown.
-	//		WaitObject::Sleep(100);
-	//	}
-	//	camera.ExposureAuto.SetValue(ExposureAuto_Off); // Switch off Exposure Auto.
-	//
-	//	cout << "Final exposure time = ";
-	//	cout << camera.ExposureTimeAbs.GetValue() << " us" << endl << endl;
-
 }
 
-void CG_SUB_InspectionDlg::OnImageGrabbed(CInstantCamera& camera_basler, const CGrabResultPtr& ptrGrabResult_basler)
+void CG_SUB_InspectionDlg::OnImageGrabbed(CInstantCamera& camera_basler, 
+	const CGrabResultPtr& ptrGrabResult_basler)
 {
-
+	if (ptrGrabResult_basler->GrabSucceeded())
+	{
+		converter.Convert(targetImage, ptrGrabResult_basler);
+		Mat cv_img = Mat(targetImage.GetHeight(), targetImage.GetWidth(), CV_8UC1);
+		cv_img = cv::Mat(targetImage.GetHeight(), targetImage.GetWidth(), CV_8UC1, 
+			(uint8_t*)targetImage.GetBuffer());
+		basler_frame = cv_img.clone();
+		if (inspect_sgn)
+		{
+		/*	if (basler_frame.data)
+			{
+				disp_image(IDC_inspec, basler_frame, gsub_ins, CRect(0, 0, 100, 100), 2);
+			}*/
+			/*if (MessageBox(L"trig", L"", MB_OKCANCEL)==IDOK)
+			{
+				cam_basler.TriggerSoftware.Execute();
+			}*/
+		}
+	}
 }
-
 #pragma endregion
+
+

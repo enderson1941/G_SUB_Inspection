@@ -33,33 +33,39 @@
 #include "INIParser.h"
 #include "map"
 #include "DbSqlite.h"
+
 //Basler
 #include <pylon/PylonIncludes.h>
 #ifdef PYLON_WIN_BUILD
 #    include <pylon/PylonGUI.h>
 #endif
-#include "pylon/gige/_BaslerGigECameraParams.h"
-#include "pylon/gige/BaslerGigECamera.h"
-#include "pylon/gige/BaslerGigEInstantCamera.h"
+//#include "pylon/gige/_BaslerGigECameraParams.h"
+//#include "pylon/gige/BaslerGigECamera.h"
+//#include "pylon/gige/BaslerGigEInstantCamera.h"
 #include "pylon/ImageEventHandler.h"
 #include "ImageEventPrinter.h"
+#include "pylon/TransportLayer.h"
 #include "pylon/ConfigurationEventHandler.h"
 #include "pylon/PylonIncludes.h"
 #include "pylon/FeaturePersistence.h"
 #include "pylon/ImagePersistence.h"
+#include "pylon/PylonBase.h"
 #include "pylon/ImageFormatConverter.h"
 #include "pylon/GrabResultPtr.h"
+#include "pylon/usb/BaslerUsbCamera.h"
+#include "pylon/usb/BaslerUsbInstantCamera.h"
 
 using namespace std;
 using namespace cv;
 using namespace Pylon;
 using namespace GenApi;
-using namespace Basler_GigECameraParams;
+//using namespace Basler_GigECameraParams;
+using namespace Basler_UsbCameraParams;
 
 #define MAX_CAMERA 1
 
 // CG_SUB_InspectionDlg dialog
-class CG_SUB_InspectionDlg : public CDialogEx
+class CG_SUB_InspectionDlg : public CDialogEx, public CImageEventHandler
 {
 	DECLARE_DYNAMIC(CG_SUB_InspectionDlg);
 
@@ -79,7 +85,8 @@ protected:
 // Instant Camera Image Event.
 // This is where we are going the receive the grabbed images.
 // This method is called from the Instant Camera grab loop thread.
-	virtual void OnImageGrabbed(CInstantCamera& camera_act, const CGrabResultPtr& ptrGrabResult_act);
+	virtual void OnImageGrabbed(CInstantCamera& camera_basler, 
+		const CGrabResultPtr& ptrGrabResult_basler);
 
 // Implementation
 protected:
@@ -93,6 +100,8 @@ protected:
 
 	DECLARE_MESSAGE_MAP()
 public:
+//	typedef CBaslerGigEInstantCamera Camera_basler;
+	typedef CBaslerUsbInstantCamera Camera_basler;
 	typedef struct camera_data
 	{
 		int camera_index;
@@ -102,26 +111,31 @@ public:
 		int frame_height;
 		int focus;
 		CString model_name;
-		BOOL inspect_sgn = FALSE;
-		VideoCapture camera;
+		BOOL cameraOpen_sgn = FALSE;
+		BOOL inspect_Result = FALSE;
+		VideoCapture cam_web;
 		Mat frame;
-		//
-		CBaslerGigEInstantCamera camera_basler;
-		CBaslerGigEImageEventHandler ImageEventHandler;
-		CBaslerGigEGrabResultPtr  m_LastGrabbedImage;
-
-		CGrabResultPtr ptrGrabResult_basler;
-		DeviceInfoList_t lstdevices_basler;
-		CLock m_lock;
+		/*CBaslerGigEImageEventHandler ImageEventHandler;
+		CBaslerGigEGrabResultPtr  m_LastGrabbedImage;*/
 	}; 
 	camera_data* camera_dat;
-	CBaslerGigEInstantCamera camera_basler;
+
+	//basler camera
+	Camera_basler	cam_basler;
+	DeviceInfoList_t devices_list;
+	CPylonImage	targetImage;
+	CImageFormatConverter converter;
+	CGrabResultPtr ptrGrabResult_basler;
+
 	int temp_int = 0;
 	int temp_index = 0;
 	int newmodel_no = 1;
 	int plan_num = 0;
+	int frame_width;
+	int frame_height;
 	double scale_index;
 	char* plan_filename = "plan.ini";
+	char* temp_filename;
 
 	CImageList* m_pImageList;
 	BOOL initialize_sgn = FALSE;
@@ -137,6 +151,7 @@ public:
 	BOOL mdy_md = FALSE;
 	BOOL inspect_sgn = FALSE;
 	BOOL m_bIsDrag = FALSE;
+	BOOL clip_sgn = FALSE;
 	CString error_message;
 	CString model_add;
 	CString temp_str;
@@ -148,7 +163,10 @@ public:
 	vector<CString> strVecAccount;
 	
 	Mat paint_ = Mat(1024, 1280, CV_8UC3, Scalar::all(240));
+	Mat basler_frame;
+	Mat target_image;
 
+	CRectTracker m_RectTracker;
 	INIParser ini_parser;
 	HTREEITEM* new_item;
 	HTREEITEM m_hDragItem;
@@ -162,6 +180,8 @@ public:
 	CRect ori_rect;
 	CRect datepick_;
 	CRect mdl_sel;
+	CRect disp_rect;
+	Rect cut_rect;
 	CWnd *pWnd;
 	CButton func_btn;
 	CButton user;
@@ -177,16 +197,16 @@ public:
 	int copy_item(HTREEITEM item, int index_);
 	int database_operation(int mode_, CString content);
 	int camera_initialization();
-	void recordTreeNode(CTreeCtrl& m_tree, HTREEITEM hTreeItem,
-		UINT& fileSum, int& layer, CString appPathFile);
+	void recordTreeNode(CTreeCtrl& m_tree, HTREEITEM hTreeItem,	UINT& fileSum, 
+		int& layer, CString appPathFile);
 	void queryTreeNode(CTreeCtrl& m_tree, HTREEITEM& hTreeItem, CString appPathFile);
 	void OnKillfocusEdit();
 	void functionarea_init(int mode_);
 	void instruction_output();
 	void disp_image(UINT disp_ID, Mat dsp_img, CWnd* pt, CRect& img_rect, int cam_index = 0);
 	void new_inspectcontent(HTREEITEM hRoot, int& newmodel_no);
-	void AutoGainContinuous(CBaslerGigEInstantCamera& camera_basler);
-	void AutoExposureContinuous(CBaslerGigEInstantCamera& camera_basler);
+	void AutoGainContinuous(Camera_basler& camera_basler);//CBaslerGigEInstantCamera
+	void AutoExposureContinuous(Camera_basler& camera_basler);
 	virtual void OnOK();
 	afx_msg void OnBnClickedfuncbutton();
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
@@ -205,6 +225,9 @@ public:
 	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
 	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
 	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
+	afx_msg void OnClose();
+	virtual void OnCancel();
+	afx_msg void OnRButtonDown(UINT nFlags, CPoint point);
 };
 
 // ClxTreeCtrl

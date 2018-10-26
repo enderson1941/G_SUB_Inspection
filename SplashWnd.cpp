@@ -146,7 +146,6 @@ BOOL SplashWnd::OnInitDialog()
 			_str = ini_parser.GetValue("Model", _str, size_);
 			theApp.model_.push_back(_str);
 		}
-		//
 		ini_parser.Clear();
 	}
 	//
@@ -157,11 +156,11 @@ BOOL SplashWnd::OnInitDialog()
 		fwrite(&sUnicodeFlag, sizeof(short int), 1, fp);
 		fclose(fp);
 		_str.Format(L"1920");
-		ini_parser.SetValue("Web Camera", L"frame_width", _str);
+		ini_parser.SetValue("Camera", L"frame_width", _str);
 		_str.Format(L"1080");
-		ini_parser.SetValue("Web Camera", L"frame_height", _str);
+		ini_parser.SetValue("Camera", L"frame_height", _str);
 		_str.Format(L"15");
-		ini_parser.SetValue("Web Camera", L"focus", _str);
+		ini_parser.SetValue("Camera", L"focus", _str);
 		//
 		_str.Format(L"1920");
 		ini_parser.SetValue("Basler Camera", L"frame_width", _str);
@@ -183,7 +182,6 @@ BOOL SplashWnd::OnInitDialog()
 	{
 		access_sign = modify_db.Open(A2T(theApp.database_file));
 		gsub_ins->database_operation(-4, L"");
-		//
 		gsub_ins->database_operation(-3, theApp.currentTime);
 	}
 	else
