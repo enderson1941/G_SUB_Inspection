@@ -53,10 +53,6 @@ BOOL SplashWnd::OnInitDialog()
 	{
 		::CreateDirectory(L"database", NULL);
 	}
-	if (!PathIsDirectory(L"error_image"))
-	{
-		::CreateDirectory(L"error_image", NULL);
-	}
 	if (!PathIsDirectory(L"temp"))
 	{
 		::CreateDirectory(L"temp", NULL);
@@ -64,6 +60,14 @@ BOOL SplashWnd::OnInitDialog()
 	if (!PathIsDirectory(L"temp\\error"))
 	{
 		::CreateDirectory(L"temp\\error", NULL);
+	}
+	if (!PathIsDirectory(L"temp\\error\\data"))
+	{
+		::CreateDirectory(L"temp\\error\\data", NULL);
+	}
+	if (!PathIsDirectory(L"temp\\error\\image"))
+	{
+		::CreateDirectory(L"temp\\error\\image", NULL);
 	}
 	if (!PathIsDirectory(L"temp\\plan"))
 	{
@@ -86,18 +90,24 @@ BOOL SplashWnd::OnInitDialog()
 	theApp.icontree_list.Add(icon_file[0]);
 	theApp.icontree_list.Add(icon_file[1]);
 
+	//test
+	WritePrivateProfileString(L"Node7", L"name", L"14-53-18-TAA", L"temp\\error\\2018-10-21.ini");
+	WritePrivateProfileString(L"Node7", L"index", L"7", L"temp\\error\\2018-10-21.ini");
+	WritePrivateProfileString(L"Node7", L"id", L"0", L"temp\\error\\2018-10-21.ini");
+	WritePrivateProfileString(L"Node7", L"layer", L"2", L"temp\\error\\2018-10-21.ini");
+	WritePrivateProfileString(L"Node8", L"name", L"标签3-欠品检出", L"temp\\error\\2018-10-21.ini");
+	WritePrivateProfileString(L"Node8", L"index", L"8", L"temp\\error\\2018-10-21.ini");
+	WritePrivateProfileString(L"Node8", L"id", L"0", L"temp\\error\\2018-10-21.ini");
+	WritePrivateProfileString(L"Node8", L"layer", L"3", L"temp\\error\\2018-10-21.ini");
+	WritePrivateProfileString(L"INFO", L"filesum", L"9", L"temp\\error\\2018-10-21.ini");
+
 	CString _str;
 	CString appPathFile;
-	FILE* fp = NULL;
-	unsigned short int sUnicodeFlag;
 	USES_CONVERSION;
 	appPathFile.Format(A2T(theApp.instruction_file));
 	if (_access(theApp.instruction_file, 0) == -1)
 	{
-		sUnicodeFlag = 0xfeff;
-		fp = _wfopen(appPathFile, _T("wb"));
-		fwrite(&sUnicodeFlag, sizeof(short int), 1, fp);
-		fclose(fp);
+		wr_unicodefile(appPathFile);
 		_str.Format(L"Cover-inner异欠品检查");
 		WritePrivateProfileString(L"INFO", L"软件功能", _str, appPathFile);
 		_str.Format(version_);
@@ -114,9 +124,7 @@ BOOL SplashWnd::OnInitDialog()
 	theApp.model_.clear();
 	if (_access(theApp.modelList_file, 0) == -1)
 	{
-		fp = _wfopen(appPathFile, _T("wb"));
-		fwrite(&sUnicodeFlag, sizeof(short int), 1, fp);
-		fclose(fp);
+		wr_unicodefile(appPathFile);
 		_str.Format(L"AJ6");
 		theApp.model_.push_back(_str);
 		ini_parser.SetValue("Model", L"0", _str);
@@ -152,9 +160,7 @@ BOOL SplashWnd::OnInitDialog()
 	appPathFile.Format(A2T(theApp.camera_file));
 	if (_access(theApp.camera_file, 0) == -1)
 	{
-		fp = _wfopen(appPathFile, _T("wb"));
-		fwrite(&sUnicodeFlag, sizeof(short int), 1, fp);
-		fclose(fp);
+		wr_unicodefile(appPathFile);
 		_str.Format(L"1920");
 		ini_parser.SetValue("Camera", L"frame_width", _str);
 		_str.Format(L"1080");
@@ -172,7 +178,6 @@ BOOL SplashWnd::OnInitDialog()
 		_str.Format(L"%d", 3);
 		WritePrivateProfileString(L"INFO", L"camerasum", _str, appPathFile);
 	}
-	delete fp;
 	CTime time(CTime::GetCurrentTime());
 	theApp.currentTime.Format(L"%04d-%02d-%02d", time.GetYear(),
 		time.GetMonth(),
@@ -220,4 +225,14 @@ BOOL SplashWnd::PreTranslateMessage(MSG* pMsg)
 	// TODO: Add your specialized code here and/or call the base class
 
 	return FALSE; //return CDialogEx::PreTranslateMessage(pMsg);
+}
+
+void SplashWnd::wr_unicodefile(CString file_path)
+{
+	FILE* fp = NULL;
+	unsigned short int sUnicodeFlag;
+	sUnicodeFlag = 0xfeff;
+	fp = _wfopen(file_path, _T("wb"));
+	fwrite(&sUnicodeFlag, sizeof(short int), 1, fp);
+	fclose(fp);
 }

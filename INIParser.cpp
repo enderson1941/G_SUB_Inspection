@@ -119,7 +119,8 @@ CString INIParser::GetValue(string root, CString key, int& size_)
 //write ini file
 int INIParser::WriteINI(char*	path)
 {
-	ofstream out_conf_file(path);
+	ofstream out_conf_file;
+	out_conf_file.open(path, ios_base::out | ios_base::app);
 	if (!out_conf_file)
 		return -1;
 	//cout << map_ini.size() << endl;

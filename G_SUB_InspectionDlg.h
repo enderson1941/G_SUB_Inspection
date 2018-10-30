@@ -62,7 +62,7 @@ using namespace GenApi;
 //using namespace Basler_GigECameraParams;
 using namespace Basler_UsbCameraParams;
 
-#define MAX_CAMERA 1
+#define MAX_CAMERA 2
 
 // CG_SUB_InspectionDlg dialog
 class CG_SUB_InspectionDlg : public CDialogEx, public CImageEventHandler
@@ -102,23 +102,28 @@ protected:
 public:
 //	typedef CBaslerGigEInstantCamera Camera_basler;
 	typedef CBaslerUsbInstantCamera Camera_basler;
-	typedef struct camera_data
+
+	struct camera_data
 	{
 		int camera_index;
-		int real_inspect_number = 0;
-		int real_NG_number = 0;
-		int frame_width;
-		int frame_height;
 		int focus;
 		CString model_name;
-		BOOL cameraOpen_sgn = FALSE;
 		BOOL inspect_Result = FALSE;
 		VideoCapture cam_web;
 		Mat frame;
-		/*CBaslerGigEImageEventHandler ImageEventHandler;
-		CBaslerGigEGrabResultPtr  m_LastGrabbedImage;*/
 	}; 
-	camera_data* camera_dat;
+	camera_data* cam_data;
+
+	struct inspectcontents_data
+	{
+		int number = 0;
+		vector<CString> contents_remarks;
+		vector<CString> contents_names;
+		vector<Mat> image_file;
+		vector<Rect> ROI;
+		vector<double> threshold;
+	};
+	inspectcontents_data* inspect_data;
 
 	//basler camera
 	Camera_basler	cam_basler;
@@ -133,11 +138,10 @@ public:
 	int plan_num = 0;
 	int frame_width;
 	int frame_height;
+	int camera_index = -1;
 	double scale_index;
-	char* plan_filename = "plan.ini";
 	char* temp_filename;
 
-	CImageList* m_pImageList;
 	BOOL initialize_sgn = FALSE;
 	BOOL load_sgn = FALSE;
 	BOOL inquery_pswd = FALSE;
@@ -152,14 +156,20 @@ public:
 	BOOL inspect_sgn = FALSE;
 	BOOL m_bIsDrag = FALSE;
 	BOOL clip_sgn = FALSE;
+	BOOL new_filesgn = FALSE;
 	CString error_message;
 	CString model_add;
 	CString temp_str;
 	CString mdy_data;
 	CString current_date;
+	CString current_model;
 	CString db_command;
+	CString clip_filepath;
+	CString error_imagefile;
+	CString error_datafile;
 	CString* treeNode_str;
 	CString* title_str;
+	CImageList* m_pImageList;
 	vector<CString> strVecAccount;
 	
 	Mat paint_ = Mat(1024, 1280, CV_8UC3, Scalar::all(240));
@@ -203,30 +213,34 @@ public:
 	void OnKillfocusEdit();
 	void functionarea_init(int mode_);
 	void instruction_output();
+	void create_edit(CWnd* ctrl, CRect  EditRect, CString contents_reserved);
 	void disp_image(UINT disp_ID, Mat dsp_img, CWnd* pt, CRect& img_rect, int cam_index = 0);
 	void new_inspectcontent(HTREEITEM hRoot, int& newmodel_no);
-	void AutoGainContinuous(Camera_basler& camera_basler);//CBaslerGigEInstantCamera
+	void AutoGainContinuous(Camera_basler& camera_basler);
 	void AutoExposureContinuous(Camera_basler& camera_basler);
 	virtual void OnOK();
+	virtual void OnCancel();
+
+	BOOL Inspect_function(int index_, Mat template_img, Mat& inspect_img, Rect ROI, double& threshold);
+
+	afx_msg void OnClose();
 	afx_msg void OnBnClickedfuncbutton();
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
+	afx_msg void OnPlanmenu1chkpln();
+	afx_msg void OnPlanmenu1chkdata();
+	afx_msg void OnPlanmenu1addmodel();
+	afx_msg void OnPlanmenu1addcontent();
+	afx_msg void OnPlanmenu1addpln();
+	afx_msg void OnPlanmenu2modpln();
 	afx_msg void OnEnChangepswd();
+	afx_msg void OnCbnSelchangemodelsel();
 	afx_msg void OnTvnSelchangedplan(NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void OnTvnBegindragplan(NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void OnNMRClickplan(NMHDR *pNMHDR, LRESULT *pResult);
-	afx_msg void OnPlanmenu1chkpln();
-	afx_msg void OnPlanmenu1chkdata();
 	afx_msg void OnDtnDatetimechangedatepick(NMHDR *pNMHDR, LRESULT *pResult);
-	afx_msg void OnPlanmenu1addpln();
-	afx_msg void OnCbnSelchangemodelsel();
-	afx_msg void OnPlanmenu2modpln();
-	afx_msg void OnPlanmenu1addmodel();
-	afx_msg void OnPlanmenu1addcontent();
 	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
 	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
 	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
-	afx_msg void OnClose();
-	virtual void OnCancel();
 	afx_msg void OnRButtonDown(UINT nFlags, CPoint point);
 };
 

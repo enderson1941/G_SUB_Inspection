@@ -71,6 +71,8 @@ CG_SUB_InspectionDlg::CG_SUB_InspectionDlg(CWnd* pParent /*=NULL*/)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 	//
+	error_imagefile = L"temp\\error\\image\\";
+	error_datafile = L"temp\\error\\data\\";
 }
 
 CG_SUB_InspectionDlg::~CG_SUB_InspectionDlg()
@@ -198,9 +200,7 @@ void CG_SUB_InspectionDlg::OnPaint()
 	CPaintDC dc(this); // device context for painting
 	if (IsIconic())
 	{
-
 		SendMessage(WM_ICONERASEBKGND, reinterpret_cast<WPARAM>(dc.GetSafeHdc()), 0);
-
 		// Center icon in client rectangle
 		int cxIcon = GetSystemMetrics(SM_CXICON);
 		int cyIcon = GetSystemMetrics(SM_CYICON);
@@ -208,19 +208,17 @@ void CG_SUB_InspectionDlg::OnPaint()
 		GetClientRect(&rect);
 		int x = (rect.Width() - cxIcon + 1) / 2;
 		int y = (rect.Height() - cyIcon + 1) / 2;
-
 		// Draw the icon
 		dc.DrawIcon(x, y, m_hIcon);
 	}
 	else
 	{
-		if (m_RectTracker.m_rect.Height())//IsRectEmpty()
+		if (m_RectTracker.m_rect.Height() > 0)//IsRectEmpty()
 		{
 			m_RectTracker.Draw(&dc);
 		}
 		CDialogEx::OnPaint();
 	}
-	
 }
 
 // The system calls this function to obtain the cursor to display while the user drags
@@ -234,6 +232,8 @@ HCURSOR CG_SUB_InspectionDlg::OnQueryDragIcon()
 void CG_SUB_InspectionDlg::OnBnClickedfuncbutton()
 {
 	// TODO: Add your control notification handler code here
+	load_sgn = TRUE;
+	disp_image(IDC_inspec, paint_, gsub_ins, CRect(0, 0, 100, 100));
 	if (!inspect_sgn)
 	{
 		plan_tree.ModifyStyle(0, TVS_DISABLEDRAGDROP, 0);
@@ -242,38 +242,35 @@ void CG_SUB_InspectionDlg::OnBnClickedfuncbutton()
 		{
 			add_pln = FALSE;
 			mdy_pln = FALSE;
-			UINT fileSum = 0;
-			int layer = 1;
-			CString appPathFile;
-			appPathFile.Format(L"temp\\plan\\" + plan_tree.GetItemText(hRoot) + L".ini");
-			unsigned short int sUnicodeFlag = 0xfeff;
-			FILE *fp;
-			fp = _wfopen(appPathFile, _T("wb"));
-			fwrite(&sUnicodeFlag, sizeof(short int), 1, fp);
-			fclose(fp);
-			recordTreeNode(plan_tree, hRoot, fileSum, layer, appPathFile);
-			//
-			CString _str;
-			_str.Format(L"%d", fileSum);
-			WritePrivateProfileString(L"INFO", L"filesum", _str, appPathFile);
+			planlist_ini(4);
 		}
 		int ncode = planlist_ini(2);
 		if (ncode != -1)
 		{
 			func_btn.SetWindowText(L"停止检测");
-			pswd_state = FALSE;
-			inspect_sgn = TRUE;
-			Mat pa_ = imread("lena.jpg");
-		//	disp_image(IDC_inspec, pa_, gsub_ins, CRect(0, 0, 100, 100), -1);
-			
+			SetTimer(0, 100, NULL);
 			cam_basler.StopGrabbing();
 			cam_basler.TriggerMode.SetValue(TriggerMode_On);
-			cam_basler.TriggerActivation.SetValue(TriggerActivation_FallingEdge);
-			cam_basler.TriggerDelay.SetValue(635000);//635000
+			cam_basler.TriggerActivation.SetValue(TriggerActivation_RisingEdge);
+			cam_basler.TriggerSelector.SetValue(TriggerSelector_FrameStart);
+			cam_basler.TriggerDelay.SetValue(63500);//635000
 			Sleep(100);
+			cam_basler.AcquisitionMode.SetValue(AcquisitionMode_Continuous);
 			cam_basler.StartGrabbing(GrabStrategy_OneByOne, GrabLoop_ProvidedByInstantCamera);
+			cam_basler.AcquisitionStart();
+			selected_item = plan_tree.GetChildItem(hRoot);
+			current_model = plan_tree.GetItemText(selected_item);
+			for (int i = 0; i < MAX_CAMERA + 1; i++)
+			{
+				camera_index = i;
+				inspect_data[i].contents_remarks.clear();
+				inspect_data[i].contents_remarks.clear();
+				inspect_data[i].ROI.clear();
+				inspect_data[i].threshold.clear();
+				database_operation(4, current_model);
+			}
+			inspect_sgn = TRUE;
 		}
-		
 	}
 	else
 	{
@@ -282,8 +279,11 @@ void CG_SUB_InspectionDlg::OnBnClickedfuncbutton()
 		func_btn.SetWindowText(L"开始检测");
 		plan_tree.DeleteAllItems();
 		cam_basler.StopGrabbing();
+		cam_basler.AcquisitionStop();
 		load_sgn = TRUE;
 		disp_image(IDC_inspec, paint_, gsub_ins, CRect(0, 0, 100, 100), -1);
+		SetTimer(0, 100, NULL);
+		KillTimer(1);
 	}
 	pswd_state = FALSE;
 	SetDlgItemText(IDC_plan_area, L"当日生产计划");
@@ -387,6 +387,7 @@ void CG_SUB_InspectionDlg::OnTimer(UINT_PTR nIDEvent)
 		hWnd = ::FindWindow(NULL, L"提示信息");
 		if (hWnd)
 		{
+			::SetFocus(hWnd);
 			keybd_event(13, 0, 0, 0);
 			KillTimer(nIDEvent);
 		}
@@ -417,21 +418,14 @@ void CG_SUB_InspectionDlg::OnTimer(UINT_PTR nIDEvent)
 	}
 	case 1:
 	{
-		for (int i = 0; i < MAX_CAMERA; i++)
+		for (int i = 0; i < 1; i++)//MAX_CAMERA
 		{
-			camera_dat[0].cam_web >> camera_dat[0].frame;
+			cam_data[i].cam_web >> cam_data[i].frame;
 		}
-	//	disp_image(IDC_inspec, camera_dat[0].frame, gsub_ins, CRect(0, 0, 100, 100), 0);
 		break;
 	}
 	case 2:
 	{
-		KillTimer(nIDEvent);
-		HWND hWnd = ::FindWindow(NULL, L"提示信息");
-		if (hWnd)
-		{
-			keybd_event(13, 0, 0, 0);
-		}
 		
 		break;
 	}
@@ -488,14 +482,16 @@ void CG_SUB_InspectionDlg::OnEnChangepswd()
 int CG_SUB_InspectionDlg::database_operation(int mode_, CString content)
 {
 	int nReturn = 0;
+	CString db_command;
+	BOOL access_sign;
 	switch (mode_)
 	{
 	case -4:
 	{
 		db_command.Format(L"CREATE TABLE '%s' ( \r\n 'i_index' TEXT, \r\n \'current_date' TEXT, \r\n \
 			'production_index' TEXT, \r\n 'production_in'	TEXT, \r\n 'production_realtime' TEXT, \r\n \
-'production_NG' TEXT, \r\n 'admin_pass1' TEXT, \r\n 'admin_pass2'	TEXT)", L"system_data");//IF NOT EXISTS
-		BOOL access_sign = spl_wnd->modify_db.DirectStatement(db_command);
+'production_NG' TEXT, \r\n 'admin_pass1' TEXT, \r\n 'admin_pass2'	TEXT)", L"system_data");
+		access_sign = spl_wnd->modify_db.DirectStatement(db_command);
 		if (!access_sign)
 		{
 			SendMessage(WM_CLOSE);
@@ -507,28 +503,27 @@ int CG_SUB_InspectionDlg::database_operation(int mode_, CString content)
 	{
 		db_command.Format(_T("INSERT INTO '%s' VALUES ( %d, '%s', %d, '%s', %d, %d, '%s', '%s')  "),
 			L"system_data", 1, content, 0, L"nul", 0, 0, L"f", L"h");
-		BOOL access_sign = spl_wnd->modify_db.DirectStatement(db_command);
+		access_sign = spl_wnd->modify_db.DirectStatement(db_command);
 		if (!access_sign)
 		{
-			return FALSE;
+			nReturn = -1;
+			return nReturn;
 		}
 		break;
 	}
 	case -2:
 	{
-		CString db_command;
 		db_command.Format(L"UPDATE system_data SET current_date = '%s' ", content);
-		BOOL access_sign = spl_wnd->modify_db.DirectStatement(db_command);
+		access_sign = spl_wnd->modify_db.DirectStatement(db_command);
 		if (!access_sign)
 		{
-			SendMessage(WM_CLOSE);
-			return FALSE;
+			nReturn = -1;
+			return nReturn;
 		}
 		break;
 	}
 	case -1:
 	{
-		CString db_command;
 		db_command.Format(L"SELECT admin_pass1, admin_pass2 FROM system_data");
 		spl_wnd->db_status = spl_wnd->modify_db.Statement(db_command);
 		if (spl_wnd->db_status != NULL)
@@ -562,7 +557,7 @@ int CG_SUB_InspectionDlg::database_operation(int mode_, CString content)
 		{
 			db_command.Format(L"CREATE TABLE '%s' ( \r\n 'i_index' TEXT, \r\n 'camera_index' TEXT, \r\n \
 			'contents_remarks' TEXT, \r\n 'image_file'	TEXT, \r\n 'ROI' TEXT, \r\n 'threshold' TEXT)", content);
-			BOOL access_sign = spl_wnd->modify_db.DirectStatement(db_command);
+			access_sign = spl_wnd->modify_db.DirectStatement(db_command);
 			if (!access_sign)
 			{
 				nReturn = -1;
@@ -571,10 +566,11 @@ int CG_SUB_InspectionDlg::database_operation(int mode_, CString content)
 		}
 		db_command.Format(_T("INSERT INTO '%s' VALUES ( %d, %d, '%s', '%s', '%s', %.2f)  "),
 			content, newmodel_no, 0, L"nul", L"nul", L"nul", 0.75f);
-		BOOL access_sign = spl_wnd->modify_db.DirectStatement(db_command);
+		access_sign = spl_wnd->modify_db.DirectStatement(db_command);
 		if (!access_sign)
 		{
-			return FALSE;
+			nReturn = -1;
+			return nReturn;
 		}
 		break;
 	}
@@ -613,11 +609,63 @@ int CG_SUB_InspectionDlg::database_operation(int mode_, CString content)
 		temp_int = plan_tree.GetItemData(selected_item);
 		db_command.Format(L"UPDATE '%s' SET '%s' = '%s' WHERE i_index == %d",
 			model_add, title_str[temp_int], content, index_);
-		BOOL access_sign = spl_wnd->modify_db.DirectStatement(db_command);
+		access_sign = spl_wnd->modify_db.DirectStatement(db_command);
 		if (!access_sign)
 		{
-			return FALSE;
+			nReturn = -1;
+			return nReturn;
 		}
+		break;
+	}
+	case 4:
+	{
+		db_command.Format(L"SELECT * FROM %s WHERE camera_index == %d", content, camera_index);
+		spl_wnd->db_status = spl_wnd->modify_db.Statement(db_command);
+		USES_CONVERSION;
+		if (spl_wnd->db_status != NULL)
+		{
+			while (spl_wnd->db_status->NextRow())
+			{
+				temp_int = 0;
+				//contents remarks
+				temp_str = spl_wnd->db_status->ValueString(2);
+				inspect_data[camera_index].contents_remarks.push_back(temp_str);
+				//image file
+				temp_str = spl_wnd->db_status->ValueString(3);
+				char* file_name = T2A(temp_str.GetBuffer(0));
+				temp_str.ReleaseBuffer();
+				Mat temp_image = imread(file_name);
+				inspect_data[camera_index].image_file.push_back(temp_image);
+				temp_int = temp_str.ReverseFind('\\');
+				temp_str = temp_str.Mid(temp_int + 1, temp_int - 3);
+				inspect_data[camera_index].contents_names.push_back(temp_str);
+				//ROI
+				temp_int = 0;
+				Rect temp_rect;
+				temp_str = spl_wnd->db_status->ValueString(4);
+				int* componts = new int[4];
+				temp_str = temp_str.Trim();
+				int index = temp_str.ReverseFind(',');
+				while (index > 0)
+				{
+					componts[temp_int] = _ttoi(temp_str.Mid(index + 1));
+					temp_str = temp_str.Mid(0, index);
+					index = temp_str.ReverseFind(',');
+					temp_int++;
+				}
+				componts[temp_int] = _ttoi(temp_str);
+				temp_int = 0;
+				temp_rect = Rect(componts[3], componts[2], componts[1], componts[0]);
+				inspect_data[camera_index].ROI.push_back(temp_rect);
+				//threshold
+				temp_str = spl_wnd->db_status->ValueString(5);
+				inspect_data[camera_index].threshold.push_back(_ttof(temp_str));
+				delete[] componts;
+			}
+			inspect_data[camera_index].number = 
+				inspect_data[camera_index].contents_remarks.size();
+		}
+		delete spl_wnd->db_status;
 		break;
 	}
 	default:
@@ -652,6 +700,10 @@ void CG_SUB_InspectionDlg::OnOK()
 			add_md = FALSE;
 			return;
 		}
+	}
+	if (mdy_md)
+	{
+		func_btn.SetFocus();
 	}
 }
 
@@ -785,19 +837,41 @@ void CG_SUB_InspectionDlg::OnKillfocusEdit()
 			mdy_data = L"model\\" + model_add + L"\\" + mdy_data;
 		}
 		database_operation(3, mdy_data);
+		if (new_filesgn)
+		{
+			temp_str = clip_filepath + L"temp.bmp";
+			CFile::Rename(temp_str, mdy_data);
+			new_filesgn = FALSE;
+		}
 	}
 	if (tmp_node == L"相机编号")
 	{
 		int index_ = _ttoi(mdy_data);
-		if (index_ < 2)
+		if (index_ < 0)
 		{
-			disp_image(IDC_inspec, camera_dat[index_].frame, gsub_ins, CRect(0, 0, 100, 100), -1);
-			target_image = camera_dat[index_].frame.clone();
+			index_ = 0;
+		}
+		if (index_ > MAX_CAMERA)
+		{
+			index_ = MAX_CAMERA;
+		}
+		if (index_ < MAX_CAMERA)
+		{
+			cam_data[index_].cam_web >> cam_data[index_].frame;
+			disp_image(IDC_inspec, cam_data[index_].frame, gsub_ins, CRect(0, 0, 100, 100), -1);
+			target_image = cam_data[index_].frame.clone();
 		}
 		else
 		{
+			cam_basler.TriggerSource.SetValue(TriggerSource_SoftwareSignal1);
+			cam_basler.SoftwareSignalSelector.SetValue(SoftwareSignalSelector_SoftwareSignal1);
+			cam_basler.StartGrabbing(GrabStrategy_OneByOne, GrabLoop_ProvidedByInstantCamera);
+			cam_basler.SoftwareSignalPulse.Execute();
+			Sleep(100);
 			disp_image(IDC_inspec, basler_frame, gsub_ins, CRect(0, 0, 100, 100), -1);
 			target_image = basler_frame.clone();
+			cam_basler.TriggerSource.SetValue(TriggerSource_SoftwareSignal1);//TriggerSource_Line1
+			cam_basler.StopGrabbing();
 		}
 		clip_sgn = TRUE;
 	}
@@ -809,6 +883,7 @@ void CG_SUB_InspectionDlg::OnKillfocusEdit()
 	}
 	m_Edit.DestroyWindow();
 	mdy_pln = FALSE;
+	m_RectTracker.m_rect.SetRectEmpty();
 }
 
 #pragma region Mouse Operation
@@ -869,22 +944,84 @@ void CG_SUB_InspectionDlg::OnRButtonDown(UINT nFlags, CPoint point)
 		ClipCursor(NULL);
 		clip_sgn = FALSE;
 		USES_CONVERSION;
-		temp_str = plan_tree.GetItemText(subRoot2);
+		HTREEITEM temp_item;
+		temp_item = plan_tree.GetNextSiblingItem(selected_item);
+		temp_item = plan_tree.GetNextSiblingItem(temp_item);
+		temp_str = plan_tree.GetItemText(temp_item);
 		temp_int = temp_str.ReverseFind(':');
 		if (temp_int == -1)
 		{
-
+			new_filesgn = TRUE;
+			CRect  EditRect;
+			plan_tree.GetItemRect(temp_item, EditRect, TRUE);
+			CString contents_reserved = plan_tree.GetItemText(temp_item);
+			create_edit(&plan_tree, EditRect, contents_reserved);
+			selected_item = temp_item;
+			temp_str = L"temp.bmp";
 		}
 		else
 		{
 			temp_str = temp_str.Mid(temp_int + 2);
-			temp_str = L"model\\" + model_add + L"\\" + temp_str;
-			temp_filename = T2A(temp_str.GetBuffer(0));
-			temp_str.ReleaseBuffer();
+			if (temp_str == L"nul")
+			{
+				new_filesgn = TRUE;
+				CRect  EditRect;
+				plan_tree.GetItemRect(temp_item, EditRect, TRUE);
+				CString contents_reserved = plan_tree.GetItemText(temp_item);
+				create_edit(&plan_tree, EditRect, contents_reserved);
+				selected_item = temp_item;
+				temp_str = L"temp.bmp";
+			}
 		}
+		clip_filepath = L"model\\" + model_add + L"\\";
+		temp_str = clip_filepath + temp_str;
+		temp_filename = T2A(temp_str.GetBuffer(0));
+		temp_str.ReleaseBuffer();
 		Mat clip_image = target_image(cut_rect);
 		imwrite(temp_filename, clip_image);
-
+		//ROI
+		temp_item = plan_tree.GetNextSiblingItem(temp_item);
+		selected_item = temp_item;
+		temp_str = plan_tree.GetItemText(temp_item);
+		int size_ = temp_str.ReverseFind(':');
+		if (size_ != -1)
+		{
+			temp_str = temp_str.Mid(0, size_);
+		}
+		CString roi_;
+		int* set_roi = new int[4];
+		set_roi[0] = cut_rect.tl().x - 40;
+		if (set_roi[0] < 0)
+		{
+			set_roi[0] = 5;
+		}
+		set_roi[1] = cut_rect.tl().y - 40;
+		if (set_roi[1] < 0)
+		{
+			set_roi[1] = 5;
+		}
+		set_roi[2] = cut_rect.width + 80;
+		if (set_roi[0] + set_roi[2] > 1905)
+		{
+			set_roi[2] = 1905 - set_roi[0];
+		}
+		set_roi[3] = cut_rect.height + 80;
+		if (set_roi[1] + set_roi[3] > 1060)
+		{
+			set_roi[3] = 1060 - set_roi[1];
+		}
+		roi_.Format(L"%d, %d, %d, %d", set_roi[0], set_roi[1], set_roi[2], set_roi[3]);
+		plan_tree.SetItemText(selected_item, temp_str + L": " + roi_);
+		database_operation(3, roi_);
+		delete[] set_roi;
+	}
+	else
+	{
+		if (cam_basler.IsPylonDeviceAttached())
+		{
+			cam_basler.SoftwareSignalSelector.SetValue(SoftwareSignalSelector_SoftwareSignal1);
+			cam_basler.SoftwareSignalPulse.Execute();
+		}
 	}
 	CDialogEx::OnRButtonDown(nFlags, point);
 }
@@ -1010,10 +1147,11 @@ void CG_SUB_InspectionDlg::OnClose()
 	KillTimer(1);
 	for (int i = 0; i < MAX_CAMERA; i++)
 	{
-		camera_dat[i].cam_web.release();
+		cam_data[i].cam_web.release();
 	}
 	cam_basler.StopGrabbing();
-	delete[] camera_dat;
+	delete[] cam_data;
+	delete[] inspect_data;
 	CDialogEx::OnCancel();
 }
 
@@ -1073,7 +1211,7 @@ int CG_SUB_InspectionDlg::planlist_ini(int mode_)
 		hRoot = plan_tree.InsertItem(current_date, 0, 0, TVI_ROOT, TVI_LAST);
 		break;
 	}
-	case 1://add
+	case 1://insert plan
 	{
 		model_sel.GetWindowText(model_add);
 		if (plan_tree.GetItemText(hRoot) != current_date)
@@ -1143,6 +1281,24 @@ int CG_SUB_InspectionDlg::planlist_ini(int mode_)
 		}
 		break;
 	}
+	case 4://save plan
+	{
+		UINT fileSum = 0;
+		int layer = 1;
+		CString appPathFile;
+		appPathFile.Format(L"temp\\plan\\" + theApp.currentTime + L".ini");//plan_tree.GetItemText(hRoot)
+		unsigned short int sUnicodeFlag = 0xfeff;
+		FILE *fp;
+		fp = _wfopen(appPathFile, _T("wb"));
+		fwrite(&sUnicodeFlag, sizeof(short int), 1, fp);
+		fclose(fp);
+		recordTreeNode(plan_tree, hRoot, fileSum, layer, appPathFile);
+		//
+		CString _str;
+		_str.Format(L"%d", fileSum);
+		WritePrivateProfileString(L"INFO", L"filesum", _str, appPathFile);
+		break;
+	}
 
 	default:
 		break;
@@ -1177,21 +1333,17 @@ void CG_SUB_InspectionDlg::OnTvnBegindragplan(NMHDR *pNMHDR, LRESULT *pResult)
 	if (label_ != current_date)
 	{
 		return;
-
 	}
-
 	m_pImageList = plan_tree.CreateDragImage(m_hDragItem);
 	if (NULL == m_pImageList)
 	{
 		return;
 	}
-
 	m_pImageList->BeginDrag(0, CPoint(0, 0)); //拖拽图像相对于鼠标焦点的偏移坐标
 	m_pImageList->DragEnter(&plan_tree, treePt);//设置图像初次显示的位置（包含偏移量）并锁定窗口为m_treeIndicators
 	m_bIsDrag = TRUE;
 	mdy_pln = TRUE;
 	SetCapture();
-
 	*pResult = 0;
 }
 
@@ -1432,27 +1584,10 @@ void CG_SUB_InspectionDlg::OnPlanmenu2modpln()
 {
 	// TODO: Add your command handler code here
 	mdy_pln = TRUE;
-	m_Edit.Create(ES_AUTOHSCROLL | WS_CHILD | ES_LEFT | ES_WANTRETURN,
-		CRect(0, 0, 0, 0), this, IDC_crtd_EDIT);
-	CString contents_reserved;
-	m_Edit.SetFont(this->GetFont(), FALSE);
-	m_Edit.SetParent(&plan_tree);
 	CRect  EditRect;
 	plan_tree.GetItemRect(selected_item, EditRect, TRUE);
-	contents_reserved = plan_tree.GetItemText(selected_item);
-	int index = contents_reserved.ReverseFind(':');
-	if (index != -1)
-	{
-		contents_reserved = contents_reserved.Mid(index + 2);
-	}
-	EditRect.SetRect(EditRect.left + EditRect.Width() + 10, EditRect.top + 1,
-		EditRect.right + EditRect.Width() + 10, EditRect.bottom - 1);
-
-	m_Edit.MoveWindow(&EditRect);
-	m_Edit.SetWindowText(contents_reserved);
-	m_Edit.ShowWindow(SW_SHOW);
-	m_Edit.SetFocus();
-	m_Edit.SetSel(-1);
+	CString contents_reserved = plan_tree.GetItemText(selected_item);
+	create_edit(&plan_tree, EditRect, contents_reserved);
 }
 
 //Write TreeNode File
@@ -1630,6 +1765,32 @@ void CG_SUB_InspectionDlg::new_inspectcontent(HTREEITEM hRoot, int& newmodel_no)
 	plan_tree.Expand(new_item[newmodel_no], TVE_EXPAND);
 	newmodel_no++;
 }
+
+//Dynamiclly Create Edit Ctrl
+void CG_SUB_InspectionDlg::create_edit(CWnd* ctrl, CRect  EditRect, CString contents_reserved)
+{
+	m_Edit.Create(ES_AUTOHSCROLL | WS_CHILD | ES_LEFT | ES_WANTRETURN,
+		CRect(0, 0, 0, 0), this, IDC_crtd_EDIT);
+	m_Edit.SetFont(this->GetFont(), FALSE);
+	m_Edit.SetParent(ctrl);//&plan_tree
+	int index = contents_reserved.ReverseFind(':');
+	if (index != -1)
+	{
+		contents_reserved = contents_reserved.Mid(index + 2);
+	}
+	else
+	{
+		contents_reserved = L" ";
+	}
+	EditRect.SetRect(EditRect.left + EditRect.Width() + 10, EditRect.top + 1,
+		EditRect.right + EditRect.Width() + 10, EditRect.bottom - 1);
+
+	m_Edit.MoveWindow(&EditRect);
+	m_Edit.SetWindowText(contents_reserved);
+	m_Edit.ShowWindow(SW_SHOW);
+	m_Edit.SetFocus();
+	m_Edit.SetSel(0, -1);
+}
 #pragma endregion
 
 #pragma region Camera
@@ -1637,53 +1798,59 @@ int CG_SUB_InspectionDlg::camera_initialization()
 {
 	int nReturn = 0;
 	/*WEB Camera*/
-	camera_dat = new camera_data[MAX_CAMERA];
+	cam_data = new camera_data[MAX_CAMERA];
+	inspect_data = new inspectcontents_data[MAX_CAMERA + 1];
 	int op_code = ini_parser.ReadINI(theApp.camera_file);
 	int size_ = 0;
 	temp_str = ini_parser.GetValue("Camera", L"frame_width", size_);
 	frame_width = _ttoi(temp_str);
 	temp_str = ini_parser.GetValue("Camera", L"frame_height", size_);
 	frame_height = _ttoi(temp_str);
-	for (int i = 0; i < MAX_CAMERA; i++)
+	for (int i = 0; i < 1; i++)//MAX_CAMERA
 	{
-		camera_dat[i].camera_index = i;
+		cam_data[i].camera_index = i;
 		temp_str = ini_parser.GetValue("Camera", L"focus", size_);
-		camera_dat[i].focus = _ttoi(temp_str);
-		camera_dat[i].cameraOpen_sgn = camera_dat[i].cam_web.open(i);
-		if (camera_dat[i].cam_web.isOpened())
+		cam_data[i].focus = _ttoi(temp_str);
+		cam_data[i].cam_web.open(CAP_DSHOW + i);
+		if (cam_data[i].cam_web.isOpened())
 		{
-			camera_dat[i].cam_web.set(CAP_PROP_FRAME_WIDTH, frame_width);
-			camera_dat[i].cam_web.set(CAP_PROP_FRAME_HEIGHT, frame_height);
-			camera_dat[i].cam_web.set(CAP_PROP_FOCUS, camera_dat[i].focus);
+			cam_data[i].cam_web.set(CAP_PROP_FRAME_WIDTH, frame_width);
+			cam_data[i].cam_web.set(CAP_PROP_FRAME_HEIGHT, frame_height);
+			cam_data[i].cam_web.set(CAP_PROP_FOCUS, cam_data[i].focus);
 		}
 		else
 		{
-			if (MessageBox(L"USB相机连接异常，单击确认键等待程序退出后，检查相机电源是否松动，并重启程序。", L"设备连接异常", MB_OK | MB_ICONERROR) == IDOK)
+			if (MessageBox(L"USB相机连接异常，单击确认键等待程序退出后，检查相机电源及连接线是否松动，\
+并重启程序。", L"设备连接异常", MB_OK | MB_ICONERROR) == IDOK)
 			{
 				SetTimer(-2, 600, NULL);
-				MessageBox(L"正在退出程序，请等待...", L"设备连接异常", MB_OK | MB_ICONWARNING);
+				MessageBox(L"程序正在退出，请稍后...", L"设备连接异常", MB_OK | MB_ICONWARNING);
+				nReturn = -1;
+				return nReturn;
 			}
 		}
 	}
 	/*Basler Camera*/
-	// Get the transport layer factory.
-	CTlFactory& TlFactory = CTlFactory::GetInstance();
+	CTlFactory& TlFactory = CTlFactory::GetInstance();// Get the transport layer factory.
 	if (TlFactory.EnumerateDevices(devices_list) == 0)
 	{
 		if (MessageBox(L"Basler相机连接异常，单击确认键等待程序退出后，\
-			检查相机电源是否松动，并重启程序。", L"设备连接异常", MB_OK | MB_ICONERROR) == IDOK)
+检查相机电源是否松动，并重启程序。", L"设备连接异常", MB_OK | MB_ICONERROR) == IDOK)
 		{
 			SetTimer(-2, 600, NULL);
-			MessageBox(L"正在退出程序，请等待...", L"设备连接异常", MB_OK | MB_ICONWARNING);
+			MessageBox(L"程序正在退出，请稍后...", L"设备连接异常", MB_OK | MB_ICONWARNING);
+			nReturn = -1;
+			return nReturn;
 		}
-		nReturn = -1;
-		return nReturn;
 	}
 	else
 	{
-		cam_basler.Attach(TlFactory.CreateDevice(devices_list[0]));
-		cam_basler.RegisterConfiguration(new CAcquireContinuousConfiguration, RegistrationMode_ReplaceAll, Ownership_TakeOwnership);
-		cam_basler.RegisterImageEventHandler(this, RegistrationMode_Append, Ownership_ExternalOwnership);
+		//create device
+		cam_basler.Attach(TlFactory.CreateFirstDevice()); // TlFactory.CreateDevice(devices_list[0])
+		cam_basler.RegisterConfiguration(new CAcquireContinuousConfiguration, 
+			RegistrationMode_ReplaceAll, Ownership_TakeOwnership);
+		cam_basler.RegisterImageEventHandler(this, RegistrationMode_Append, 
+			Ownership_ExternalOwnership);
 		
 		cam_basler.Open();
 		cam_basler.AcquisitionMode.SetValue(AcquisitionMode_Continuous);
@@ -1691,38 +1858,20 @@ int CG_SUB_InspectionDlg::camera_initialization()
 		AutoGainContinuous(cam_basler);
 		// Carry out luminance control by using the "continuous" exposure auto function.
 		AutoExposureContinuous(cam_basler);
-		cam_basler.TriggerSource.SetValue(TriggerSource_Software);
+		cam_basler.TriggerSource.SetValue(TriggerSource_SoftwareSignal1);//TriggerSource_Line1
 		cam_basler.TriggerMode.SetValue(TriggerMode_Off);
 		converter.OutputPixelFormat = PixelType_Mono8;
 		cam_basler.Width.SetValue(frame_width);
 		cam_basler.Height.SetValue(frame_height);
+		cam_basler.CenterX.SetValue(TRUE);
+		cam_basler.CenterY.SetValue(TRUE);
 		
 		cam_basler.StartGrabbing(GrabStrategy_OneByOne, GrabLoop_ProvidedByInstantCamera);
-		SetTimer(2, 2000, NULL);
+		SetTimer(-2, 1200, NULL);
 		MessageBox(L"相机初始化中，请稍后...", L"提示信息", MB_ICONINFORMATION | MB_OK);
-
-	
-//		camera_act.AcquisitionMode.SetValue(AcquisitionMode_Continuous);
-//		camera_act.TriggerSelector.SetValue(TriggerSelector_FrameStart);
-//		camera_act.TriggerMode.SetValue(TriggerMode_On);
-//		camera_act.TriggerSource.SetValue(TriggerSource_Line1);
-//		camera_act.TriggerActivation.SetValue(TriggerActivation_FallingEdge);
-//		camera_act.TriggerDelayAbs.SetValue(635000);//900000
-//		camera_act.Width.SetValue(IMAGE_WIDTH);
-//		camera_act.Height.SetValue(IMAGE_HEIGHT);
-//		/*HICON _hIcon = NULL;
-//		_hIcon = AfxGetApp()->LoadIcon(IDI_ICON77);
-//		cam_indi_[2].SetIcon(_hIcon);*/
-//		SetTimer(1, 800, NULL);
-//		MessageBox(L"相机已初始化完毕。", L"设备初始化");
-//		tmp_.Format(L"Basler相机已成功打开，请等待检测开始。");
-//		SetDlgItemText(IDC_instxt, tmp_);
-//#pragma endregion
 	}
-//#pragma endregion
-
 	ini_parser.Clear();
-	SetTimer(1, 500, NULL);
+	SetTimer(1, 100, NULL);
 	return nReturn;
 }
 
@@ -1852,17 +2001,146 @@ void CG_SUB_InspectionDlg::OnImageGrabbed(CInstantCamera& camera_basler,
 		basler_frame = cv_img.clone();
 		if (inspect_sgn)
 		{
-		/*	if (basler_frame.data)
+			for (int m = 0; m < MAX_CAMERA; m++)
 			{
-				disp_image(IDC_inspec, basler_frame, gsub_ins, CRect(0, 0, 100, 100), 2);
-			}*/
-			/*if (MessageBox(L"trig", L"", MB_OKCANCEL)==IDOK)
+				cam_data[m].cam_web >> cam_data[m].frame;
+				camera_index = m;
+				for (int n = 0; n < inspect_data[m].number; n++)
+				{
+					double thres_ = inspect_data[m].threshold[n];
+					Inspect_function(n, inspect_data[m].image_file[n], cam_data[m].frame, 
+						inspect_data[m].ROI[n], thres_);
+					disp_image(IDC_inspec, cam_data[m].frame, gsub_ins, CRect(0, 0, 100, 100), m);
+				}
+			}
+			for (int p = 0; p < inspect_data[MAX_CAMERA].number; p++)
 			{
-				cam_basler.TriggerSoftware.Execute();
-			}*/
+				camera_index = MAX_CAMERA;
+				double thres_ = inspect_data[MAX_CAMERA].threshold[p];
+				Inspect_function(p, inspect_data[MAX_CAMERA].image_file[p], basler_frame, 
+					inspect_data[MAX_CAMERA].ROI[p], thres_);
+				disp_image(IDC_inspec, basler_frame, gsub_ins, CRect(0, 0, 100, 100), MAX_CAMERA);
+			}
 		}
 	}
 }
 #pragma endregion
 
+#pragma region Inspection
+BOOL CG_SUB_InspectionDlg::Inspect_function(int index_, Mat template_img, 
+	Mat& inspect_img, Rect ROI, double& threshold)
+{
+	int res_cols;
+	int res_rows;
+	int count_process;
+	double err_value = 0;
+	double minVal;
+	double maxVal;
+	double scale_precise = 0.1;
+	double max_scale = 0.2;
 
+	Mat tpl_image;
+	Mat temp_image;
+	Mat res_image;
+	Mat ori_image;
+	Mat gray_image;
+	Point temp_Loc;
+	Point minLoc;
+	Point maxLoc;
+	BOOL check_sgn = FALSE;
+
+	tpl_image = template_img.clone();
+	ori_image = inspect_img.clone();
+	
+	count_process = (int)((2 * max_scale) / scale_precise) + 1;
+	if (inspect_img.channels() > 1)
+	{
+		cvtColor(inspect_img.clone(), gray_image, CV_BGR2GRAY);
+	}
+	else
+	{
+		gray_image = inspect_img.clone();
+		cvtColor(inspect_img.clone(), ori_image, CV_GRAY2BGR);
+	}
+	if (tpl_image.channels() > 1)
+	{
+		cvtColor(tpl_image.clone(), tpl_image, CV_BGR2GRAY);
+	}
+	gray_image = gray_image(ROI);
+	for (int i = 0; i < 4; i++)
+	{
+		double scale_ = 0.8 + 0.1 * i;
+		cv::resize(tpl_image.clone(), temp_image, 
+			cv::Size(tpl_image.cols * scale_, tpl_image.rows * scale_));
+
+		res_cols = gray_image.cols - temp_image.cols + 1;
+		res_rows = gray_image.rows - temp_image.rows + 1;
+		res_image = Mat(res_cols, res_rows, CV_32FC1);
+
+		matchTemplate(gray_image, temp_image, res_image, CV_TM_CCOEFF_NORMED);
+		minMaxLoc(res_image, &minVal, &maxVal, &minLoc, &temp_Loc);
+		temp_Loc.x += ROI.x;
+		temp_Loc.y += ROI.y;
+		if (maxVal > threshold)
+		{
+			threshold = maxVal;
+			maxLoc = temp_Loc;
+			check_sgn = TRUE;
+			break;
+		}
+		else
+		{
+			if (err_value < maxVal)
+			{
+				err_value = maxVal;
+			}
+		}
+	}
+	if (!check_sgn)//NG
+	{
+		rectangle(ori_image, ROI.tl(), ROI.br(), cvScalar(0, 0, 255, 0), 6, 8, 0);
+		USES_CONVERSION;
+		CString err_text;
+		err_text.Format(L"err: %.2f", err_value);
+		char* err_msg = T2A(err_text.GetBuffer(0));
+		err_text.ReleaseBuffer();
+		putText(ori_image, err_msg, ROI.br(), cv::HersheyFonts::FONT_HERSHEY_COMPLEX, 2.5, Scalar(0, 0, 255), 2);
+		if (!PathIsDirectory(error_imagefile + current_date))
+		{
+			::CreateDirectory(error_imagefile + current_date, NULL);
+		}
+		if (!PathIsDirectory(error_datafile + current_date))
+		{
+			::CreateDirectory(error_datafile + current_date, NULL);
+		}
+		if (abs(err_value - threshold) < 0.15)
+		{
+			err_text = L"异品检出";
+		}
+		else
+		{
+			err_text = L"欠品检出";
+		}
+		CString err_date;
+		CTime time(CTime::GetCurrentTime());
+		//image
+		err_date.Format(L"%s%s//%02d-%02d-%02d-%s-%s.bmp" , error_imagefile, current_date,
+			time.GetHour(),
+			time.GetMinute(),
+			time.GetSecond(),
+			current_model, inspect_data[camera_index].contents_names[index_]);
+		err_msg = T2A(err_date.GetBuffer(0));
+		err_date.ReleaseBuffer();
+		imwrite(err_msg, ori_image);
+		//data
+
+	}
+	else//OK
+	{
+		rectangle(ori_image, maxLoc, Point(maxLoc.x + tpl_image.cols, maxLoc.y + tpl_image.rows),
+			cvScalar(0, 255, 0, 0), 6, 8, 0);
+	}
+	inspect_img = ori_image.clone();
+	return check_sgn;
+}
+#pragma endregion
