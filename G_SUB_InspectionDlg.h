@@ -108,7 +108,6 @@ public:
 		int camera_index;
 		int focus;
 		CString model_name;
-		BOOL inspect_Result = FALSE;
 		VideoCapture cam_web;
 		Mat frame;
 	}; 
@@ -122,6 +121,7 @@ public:
 		vector<Mat> image_file;
 		vector<Rect> ROI;
 		vector<double> threshold;
+		BOOL inspect_Result = FALSE;
 	};
 	inspectcontents_data* inspect_data;
 
@@ -132,6 +132,9 @@ public:
 	CImageFormatConverter converter;
 	CGrabResultPtr ptrGrabResult_basler;
 
+	int plan_produce = 0;
+	int real_produce = 0;
+	int ng_produce = 0;
 	int temp_int = 0;
 	int temp_index = 0;
 	int newmodel_no = 1;
@@ -210,6 +213,7 @@ public:
 	void recordTreeNode(CTreeCtrl& m_tree, HTREEITEM hTreeItem,	UINT& fileSum, 
 		int& layer, CString appPathFile);
 	void queryTreeNode(CTreeCtrl& m_tree, HTREEITEM& hTreeItem, CString appPathFile);
+	void get_produceinfo(HTREEITEM model);
 	void OnKillfocusEdit();
 	void functionarea_init(int mode_);
 	void instruction_output();
@@ -218,6 +222,7 @@ public:
 	void new_inspectcontent(HTREEITEM hRoot, int& newmodel_no);
 	void AutoGainContinuous(Camera_basler& camera_basler);
 	void AutoExposureContinuous(Camera_basler& camera_basler);
+	void record_errormessage(CString value1, CString value2, CString file_path);
 	virtual void OnOK();
 	virtual void OnCancel();
 

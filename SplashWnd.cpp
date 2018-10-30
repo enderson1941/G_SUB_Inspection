@@ -90,17 +90,6 @@ BOOL SplashWnd::OnInitDialog()
 	theApp.icontree_list.Add(icon_file[0]);
 	theApp.icontree_list.Add(icon_file[1]);
 
-	//test
-	WritePrivateProfileString(L"Node7", L"name", L"14-53-18-TAA", L"temp\\error\\2018-10-21.ini");
-	WritePrivateProfileString(L"Node7", L"index", L"7", L"temp\\error\\2018-10-21.ini");
-	WritePrivateProfileString(L"Node7", L"id", L"0", L"temp\\error\\2018-10-21.ini");
-	WritePrivateProfileString(L"Node7", L"layer", L"2", L"temp\\error\\2018-10-21.ini");
-	WritePrivateProfileString(L"Node8", L"name", L"标签3-欠品检出", L"temp\\error\\2018-10-21.ini");
-	WritePrivateProfileString(L"Node8", L"index", L"8", L"temp\\error\\2018-10-21.ini");
-	WritePrivateProfileString(L"Node8", L"id", L"0", L"temp\\error\\2018-10-21.ini");
-	WritePrivateProfileString(L"Node8", L"layer", L"3", L"temp\\error\\2018-10-21.ini");
-	WritePrivateProfileString(L"INFO", L"filesum", L"9", L"temp\\error\\2018-10-21.ini");
-
 	CString _str;
 	CString appPathFile;
 	USES_CONVERSION;
