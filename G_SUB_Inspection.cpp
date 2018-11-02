@@ -157,7 +157,7 @@ int CG_SUB_InspectionApp::ExitInstance()
 	ExitProcess(0);
 	// Add this code in Destruction function
 
-	PylonTerminate();
+//	PylonTerminate();
 
 	return CWinApp::ExitInstance();
 }

@@ -96,7 +96,6 @@ protected:
 
 	// Generated message map functions
 	virtual BOOL OnInitDialog();
-	static UINT ThreadFunc(LPVOID pParam);
 
 	afx_msg void OnSysCommand(UINT nID, LPARAM lParam);
 	afx_msg void OnPaint();
@@ -108,7 +107,7 @@ public:
 
 	struct camera_data
 	{
-		int camera_index;
+		int camera_index = -1;
 		int focus;
 		CString model_name;
 		VideoCapture cam_web;

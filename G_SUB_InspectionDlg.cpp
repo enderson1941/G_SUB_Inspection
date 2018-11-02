@@ -461,8 +461,9 @@ void CG_SUB_InspectionDlg::OnTimer(UINT_PTR nIDEvent)
 		hWnd = ::FindWindow(NULL, L"设备连接异常");
 		if (hWnd)
 		{
-			keybd_event(13, 0, 0, 0);
 			KillTimer(nIDEvent);
+			/*::SetForegroundWindow(hWnd);*/
+			::SendMessage(hWnd, WM_SYSCOMMAND, SC_CLOSE, NULL);
 			SendMessage(WM_CLOSE);
 		}
 		hWnd = ::FindWindow(NULL, L"系统信息");
@@ -470,7 +471,7 @@ void CG_SUB_InspectionDlg::OnTimer(UINT_PTR nIDEvent)
 		{
 			KillTimer(nIDEvent);
 			::SetForegroundWindow(hWnd);
-			::SendMessage(hWnd, WM_SYSCOMMAND, SC_CLOSE, NULL);
+			keybd_event(13, 0, 0, 0);
 		}
 		break;
 	}
@@ -1304,29 +1305,29 @@ void CG_SUB_InspectionDlg::instruction_output()
 void CG_SUB_InspectionDlg::OnClose()
 {
 	// TODO: Add your message handler code here and/or call default
+	KillTimer(1);
 	plan_tree.DeleteAllItems();
-	CWinThread* hThread = AfxBeginThread(ThreadFunc, (LPVOID)(LPCTSTR)0, THREAD_PRIORITY_NORMAL, 0, CREATE_SUSPENDED);
-	hThread->ResumeThread();
-	SetTimer(-2, 1500, NULL);
-	MessageBox(L"软件正在退出，请稍后...", L"系统信息", MB_OK | MB_ICONINFORMATION);
-	cam_basler.StopGrabbing();
+	for (int i = 0; i < MAX_CAMERA; i++)
+	{
+		if (cam_data[i].cam_web.isOpened())
+		{
+			cam_data[i].cam_web.release();
+		}
+	}
+	if (cam_basler.IsPylonDeviceAttached())
+	{
+		cam_basler.StopGrabbing();
+	}
 	delete[] cam_data;
 	delete[] inspect_data;
 	CDialogEx::OnCancel();
 }
 
-UINT CG_SUB_InspectionDlg::ThreadFunc(LPVOID pParam)
-{
-	for (int i = 0; i < MAX_CAMERA; i++)
-	{
-		gsub_ins->cam_data[i].cam_web.release();
-	}
-	return 0;
-}
-
 void CG_SUB_InspectionDlg::OnCancel()
 {
 	// TODO: Add your specialized code here and/or call the base class
+	SetTimer(-2, 800, NULL);
+	MessageBox(L"程序正在退出，请稍后...", L"提示信息", MB_OKCANCEL | MB_ICONINFORMATION);
 	OnClose();
 }
 #pragma endregion
@@ -2088,7 +2089,7 @@ int CG_SUB_InspectionDlg::camera_initialization()
 并重启程序。", L"设备连接异常", MB_OK | MB_ICONERROR) == IDOK)
 			{
 				SetTimer(-2, 600, NULL);
-				MessageBox(L"程序正在退出，请稍后...", L"设备连接异常", MB_OK | MB_ICONWARNING);
+				MessageBox(L"程序正在退出，请稍后...", L"设备连接异常", MB_OKCANCEL | MB_ICONWARNING);
 				nReturn = -1;
 				return nReturn;
 			}
@@ -2103,7 +2104,7 @@ int CG_SUB_InspectionDlg::camera_initialization()
 检查相机电源是否松动，并重启程序。", L"设备连接异常", MB_OK | MB_ICONERROR) == IDOK)
 		{
 			SetTimer(-2, 600, NULL);
-			MessageBox(L"程序正在退出，请稍后...", L"设备连接异常", MB_OK | MB_ICONWARNING);
+			MessageBox(L"程序正在退出，请稍后...", L"设备连接异常", MB_OKCANCEL | MB_ICONWARNING);
 			nReturn = -1;
 			return nReturn;
 		}
