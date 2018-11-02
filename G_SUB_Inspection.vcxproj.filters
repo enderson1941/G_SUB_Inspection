@@ -95,5 +95,11 @@
     <Image Include="res\Eprint Banner Image.bmp">
       <Filter>Resource Files</Filter>
     </Image>
+    <Image Include="res\if_power_926636.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="res\if_refresh_926645.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
   </ItemGroup>
 </Project>

@@ -242,6 +242,8 @@
     <Image Include="res\G_SUB_Inspection.ico" />
     <Image Include="res\icon_date.ico" />
     <Image Include="res\icon_plan.ico" />
+    <Image Include="res\if_power_926636.ico" />
+    <Image Include="res\if_refresh_926645.ico" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -28,9 +28,7 @@ public:
 	DWORD dwRet;
 	INIParser	ini_parser;
 	HICON* icon_file;
-	CDbSQLite modify_db;
-	CSqlStatement* db_status;
-
+	
 	void wr_unicodefile(CString file_path);
 	virtual BOOL OnInitDialog();
 	virtual BOOL PreTranslateMessage(MSG* pMsg);

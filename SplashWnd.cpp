@@ -81,6 +81,7 @@ BOOL SplashWnd::OnInitDialog()
 	version_.LoadString(IDS_version);
 	SetDlgItemText(IDC_version_no, L"version: " + version_);
 	SetBackgroundImage(IDB_BITMAP1, CDialogEx::BACKGR_TILE);
+	Sleep(100);
 
 	icon_file = new HICON[2];
 	theApp.icontree_list.Create(25, 25, ILC_COLOR32, 3, 3);
@@ -113,7 +114,6 @@ BOOL SplashWnd::OnInitDialog()
 	theApp.model_.clear();
 	if (_access(theApp.modelList_file, 0) == -1)
 	{
-		wr_unicodefile(appPathFile);
 		_str.Format(L"AJ6");
 		theApp.model_.push_back(_str);
 		ini_parser.SetValue("Model", L"0", _str);
@@ -149,7 +149,6 @@ BOOL SplashWnd::OnInitDialog()
 	appPathFile.Format(A2T(theApp.camera_file));
 	if (_access(theApp.camera_file, 0) == -1)
 	{
-		wr_unicodefile(appPathFile);
 		_str.Format(L"1920");
 		ini_parser.SetValue("Camera", L"frame_width", _str);
 		_str.Format(L"1080");
@@ -161,6 +160,8 @@ BOOL SplashWnd::OnInitDialog()
 		ini_parser.SetValue("Basler Camera", L"frame_width", _str);
 		_str.Format(L"1080");
 		ini_parser.SetValue("Basler Camera", L"frame_height", _str);
+		_str.Format(L"5");
+		ini_parser.SetValue("Basler Camera", L"trigger_source", _str);
 		//
 		ini_parser.WriteINI(theApp.camera_file);
 		ini_parser.Clear();
@@ -171,21 +172,8 @@ BOOL SplashWnd::OnInitDialog()
 	theApp.currentTime.Format(L"%04d-%02d-%02d", time.GetYear(),
 		time.GetMonth(),
 		time.GetDay());
-	BOOL access_sign;
-	if (_access(theApp.database_file, 0) == -1)
-	{
-		access_sign = modify_db.Open(A2T(theApp.database_file));
-		gsub_ins->database_operation(-4, L"");
-		gsub_ins->database_operation(-3, theApp.currentTime);
-	}
-	else
-	{
-		access_sign = modify_db.Open(A2T(theApp.database_file));
-		gsub_ins->database_operation(-2, theApp.currentTime);
-	}
-	gsub_ins->database_operation(-1, L"");
 
-	SetTimer(0, 2500, NULL);
+	SetTimer(0, 800, NULL);
 	return TRUE;  // return TRUE unless you set the focus to a control
 				  // EXCEPTION: OCX Property Pages should return FALSE
 }

@@ -12,6 +12,7 @@
 #endif
 
 #define IDC_crtd_EDIT 9000
+#define IDC_crtd_INFO 9001
 
 ClxTreeCtrl plan_tree;
 
@@ -119,6 +120,7 @@ BEGIN_MESSAGE_MAP(CG_SUB_InspectionDlg, CDialogEx)
 	ON_WM_MOUSEMOVE()
 	ON_WM_CLOSE()
 	ON_WM_RBUTTONDOWN()
+	ON_COMMAND(ID_PLANMENU1_export, &CG_SUB_InspectionDlg::OnPlanmenu1export)
 END_MESSAGE_MAP()
 
 // CG_SUB_InspectionDlg message handlers
@@ -154,16 +156,39 @@ BOOL CG_SUB_InspectionDlg::OnInitDialog()
 	// TODO: Add extra initialization here
 	gsub_ins = this;
 	CenterWindow();
+
+	USES_CONVERSION;
+	BOOL access_sign;
+	if (_access(theApp.database_file, 0) == -1)
+	{
+		access_sign = modify_db.Open(A2T(theApp.database_file));
+		database_operation(-4, L"");
+		database_operation(-3, theApp.currentTime);
+	}
+	else
+	{
+		access_sign = modify_db.Open(A2T(theApp.database_file));
+		database_operation(-2, theApp.currentTime);
+	}
+	database_operation(-1, L"");
+
 	//
 	functionarea_init(-1);
+	m_hIcon = NULL;
+	m_hIcon = (HICON)LoadImage(AfxGetApp()->m_hInstance, MAKEINTRESOURCE(IDI_ICON4),
+		IMAGE_ICON, 40, 40, LR_DEFAULTCOLOR);
+	func_btn.SetIcon(m_hIcon);
+	func_btn.SetWindowText(L"开始\r\n检测");
 	instruction_output();
 	initialize_sgn = TRUE;
+
 	//camera initialization
 	camera_initialization();
 
 	COLORREF oldColor = RGB(240, 240, 240);
 	plan_tree.SetBkColor(oldColor);
 	plan_tree.SetImageList(&theApp.icontree_list, TVSIL_NORMAL);
+	plan_tree.ModifyStyle(TVS_DISABLEDRAGDROP, 0);
 
 	for (int i = 0; i < theApp.model_.size(); i++)
 	{
@@ -176,6 +201,7 @@ BOOL CG_SUB_InspectionDlg::OnInitDialog()
 
 	//repaint screen
 	SetTimer(-1, 10, NULL);
+	modify_history.clear();
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
 
@@ -232,54 +258,98 @@ HCURSOR CG_SUB_InspectionDlg::OnQueryDragIcon()
 void CG_SUB_InspectionDlg::OnBnClickedfuncbutton()
 {
 	// TODO: Add your control notification handler code here
+#pragma region clearSection
 	load_sgn = TRUE;
 	disp_image(IDC_inspec, paint_, gsub_ins, CRect(0, 0, 100, 100));
+	add_md = FALSE;
+	add_content = FALSE;
+	add_pln = FALSE;
+	mdy_pln = FALSE;
+	inquery_pswd = FALSE;
+	pswd_state = FALSE;
+	inquery_pln = FALSE;
+	inquery_dat = FALSE;
+	mdy_md = FALSE;
+	m_Info.DestroyWindow();
+	functionarea_init(0);
+#pragma endregion
 	if (!inspect_sgn)
 	{
 		plan_tree.ModifyStyle(0, TVS_DISABLEDRAGDROP, 0);
-		functionarea_init(0);
+		int ret = database_operation(-5, L"NULL");
+		if (ret == 1)
+		{
+			return;
+		}
 		temp_str = plan_tree.GetItemText(hRoot);
 		CString temp_;
 		datepick.GetWindowText(temp_);
 		if (temp_str == current_date || temp_str == temp_)
 		{
-			add_pln = FALSE;
-			mdy_pln = FALSE;
 			planlist_ini(4);
 		}
 		int ncode = planlist_ini(2);
 		if (ncode != -1)
 		{
-			func_btn.SetWindowText(L"停止检测");
 			SetTimer(0, 100, NULL);
+#pragma region Basler
 			cam_basler.StopGrabbing();
+			Sleep(200);
 			cam_basler.TriggerMode.SetValue(TriggerMode_On);
 			cam_basler.TriggerActivation.SetValue(TriggerActivation_RisingEdge);
 			cam_basler.TriggerSelector.SetValue(TriggerSelector_FrameStart);
-			cam_basler.TriggerDelay.SetValue(63500);//635000
-			Sleep(100);
+			cam_basler.TriggerDelay.SetValue(635000);//635000
 			cam_basler.AcquisitionMode.SetValue(AcquisitionMode_Continuous);
 			cam_basler.StartGrabbing(GrabStrategy_OneByOne, GrabLoop_ProvidedByInstantCamera);
 			cam_basler.AcquisitionStart();
-			temp_str = plan_tree.GetItemText(hRoot);
+			Sleep(200);
+#pragma endregion
+#pragma region Plan
 			selected_item = plan_tree.GetChildItem(hRoot);
+			temp_int = plan_tree.GetItemData(selected_item);
+			while (temp_int == -1)
+			{
+				selected_item = plan_tree.GetNextSiblingItem(selected_item);
+				temp_int = plan_tree.GetItemData(selected_item);
+			}
 			current_model = plan_tree.GetItemText(selected_item);
-			get_produceinfo(selected_item);
+			BOOL op = get_produceinfo(selected_item);
+			if (!op)
+			{
+				planlist_ini(0);
+				return;
+			}
+			database_operation(5, current_model);
+#pragma endregion
 			inspect_sgn = TRUE;
+			m_hIcon = NULL;
+			m_hIcon = (HICON)LoadImage(AfxGetApp()->m_hInstance, MAKEINTRESOURCE(IDI_ICON3),
+				IMAGE_ICON, 40, 40, LR_DEFAULTCOLOR);
+			func_btn.SetIcon(m_hIcon);
+			func_btn.SetWindowText(L"停止\r\n检测");
 		}
 	}
 	else
 	{
 		plan_tree.ModifyStyle(TVS_DISABLEDRAGDROP, 0);
+		planlist_ini(4);
 		inspect_sgn = FALSE;
-		func_btn.SetWindowText(L"开始检测");
+		inspect_complete = FALSE;
+		m_hIcon = NULL;
+		m_hIcon = (HICON)LoadImage(AfxGetApp()->m_hInstance, MAKEINTRESOURCE(IDI_ICON4),
+			IMAGE_ICON, 40, 40, LR_DEFAULTCOLOR);
+		func_btn.SetIcon(m_hIcon);
+		func_btn.SetWindowText(L"开始\r\n检测");
 		plan_tree.DeleteAllItems();
 		cam_basler.StopGrabbing();
 		cam_basler.AcquisitionStop();
 		load_sgn = TRUE;
 		disp_image(IDC_inspec, paint_, gsub_ins, CRect(0, 0, 100, 100), -1);
 		SetTimer(0, 100, NULL);
-		KillTimer(1);
+		plan_num = 1;
+		plan_produce = 0;
+		real_produce = 0;
+		ng_produce = 0;
 	}
 	pswd_state = FALSE;
 	SetDlgItemText(IDC_plan_area, L"当日生产计划");
@@ -383,9 +453,10 @@ void CG_SUB_InspectionDlg::OnTimer(UINT_PTR nIDEvent)
 		hWnd = ::FindWindow(NULL, L"提示信息");
 		if (hWnd)
 		{
-			::SetFocus(hWnd);
-			keybd_event(13, 0, 0, 0);
+			::SetForegroundWindow(hWnd);
+			::SendMessage(hWnd, WM_SYSCOMMAND, SC_CLOSE, NULL);
 			KillTimer(nIDEvent);
+			KillTimer(1);
 		}
 		hWnd = ::FindWindow(NULL, L"设备连接异常");
 		if (hWnd)
@@ -393,6 +464,13 @@ void CG_SUB_InspectionDlg::OnTimer(UINT_PTR nIDEvent)
 			keybd_event(13, 0, 0, 0);
 			KillTimer(nIDEvent);
 			SendMessage(WM_CLOSE);
+		}
+		hWnd = ::FindWindow(NULL, L"系统信息");
+		if (hWnd)
+		{
+			KillTimer(nIDEvent);
+			::SetForegroundWindow(hWnd);
+			::SendMessage(hWnd, WM_SYSCOMMAND, SC_CLOSE, NULL);
 		}
 		break;
 	}
@@ -414,15 +492,10 @@ void CG_SUB_InspectionDlg::OnTimer(UINT_PTR nIDEvent)
 	}
 	case 1:
 	{
-		for (int i = 0; i < 1; i++)//MAX_CAMERA
+		for (int i = 0; i < MAX_CAMERA; i++)//MAX_CAMERA
 		{
 			cam_data[i].cam_web >> cam_data[i].frame;
 		}
-		break;
-	}
-	case 2:
-	{
-		
 		break;
 	}
 	default:
@@ -441,6 +514,7 @@ void CG_SUB_InspectionDlg::OnEnChangepswd()
 	// TODO:  Add your control notification handler code here
 	CString pswd_text;
 	pswd_edt.GetWindowText(pswd_text);
+	m_Info.DestroyWindow();
 	if (add_md)
 	{
 		if (pswd_text == theApp.admin_pass[1])
@@ -449,6 +523,8 @@ void CG_SUB_InspectionDlg::OnEnChangepswd()
 			pswd_edt.SetWindowText(NULL);
 			functionarea_init(2);
 			SetDlgItemText(IDC_plan_area, L"添加机种信息");
+			plan_tree.ModifyStyle(TVS_DISABLEDRAGDROP, 0);
+			mdy_md = TRUE;
 		}
 	}
 	else
@@ -470,6 +546,7 @@ void CG_SUB_InspectionDlg::OnEnChangepswd()
 			{
 				functionarea_init(3);
 			}
+			plan_tree.ModifyStyle(TVS_DISABLEDRAGDROP, 0);
 		}
 	}
 }
@@ -482,12 +559,37 @@ int CG_SUB_InspectionDlg::database_operation(int mode_, CString content)
 	BOOL access_sign;
 	switch (mode_)
 	{
+	case -5:
+	{
+		db_command.Format(L"SELECT production_index, production_in FROM system_data");
+		db_status = modify_db.Statement(db_command);
+		if (db_status != NULL)
+		{
+			while ((db_status)->NextRow())
+			{
+				temp_str = (db_status)->ValueString(1);
+				if (temp_str == L"NULL")
+				{
+					SetTimer(-2, 800, NULL);
+					MessageBox(L"生产计划已完成，请继续添加。", L"提示信息", MB_OK | MB_ICONINFORMATION);
+					nReturn = 1;
+				}
+				else
+				{
+					temp_str = (db_status)->ValueString(0);
+					temp_index = _ttoi(temp_str);
+				}
+			}
+		}
+		delete db_status;
+		break;
+	}
 	case -4:
 	{
-		db_command.Format(L"CREATE TABLE '%s' ( \r\n 'i_index' TEXT, \r\n \'current_date' TEXT, \r\n \
+		db_command.Format(L"CREATE TABLE '%s' ( \r\n 'i_index' TEXT, \r\n \'cur_date' TEXT, \r\n \
 			'production_index' TEXT, \r\n 'production_in'	TEXT, \r\n 'production_realtime' TEXT, \r\n \
-'production_NG' TEXT, \r\n 'admin_pass1' TEXT, \r\n 'admin_pass2'	TEXT)", L"system_data");
-		access_sign = spl_wnd->modify_db.DirectStatement(db_command);
+'production_NG' TEXT, 'inspect_complete' TEXT, \r\n 'admin_pass1' TEXT, \r\n 'admin_pass2'	TEXT)", L"system_data");
+		access_sign = modify_db.DirectStatement(db_command);
 		if (!access_sign)
 		{
 			SendMessage(WM_CLOSE);
@@ -497,9 +599,9 @@ int CG_SUB_InspectionDlg::database_operation(int mode_, CString content)
 	}
 	case -3:
 	{
-		db_command.Format(_T("INSERT INTO '%s' VALUES ( %d, '%s', %d, '%s', %d, %d, '%s', '%s')  "),
-			L"system_data", 1, content, 0, L"nul", 0, 0, L"f", L"h");
-		access_sign = spl_wnd->modify_db.DirectStatement(db_command);
+		db_command.Format(_T("INSERT INTO '%s' VALUES ( %d, '%s', %d, '%s', %d, %d, %d, '%s', '%s')  "),
+			L"system_data", 1, content, 0, L"nul", 0, 0, 0, L"f", L"h");
+		access_sign = modify_db.DirectStatement(db_command);
 		if (!access_sign)
 		{
 			nReturn = -1;
@@ -509,8 +611,8 @@ int CG_SUB_InspectionDlg::database_operation(int mode_, CString content)
 	}
 	case -2:
 	{
-		db_command.Format(L"UPDATE system_data SET current_date = '%s' ", content);
-		access_sign = spl_wnd->modify_db.DirectStatement(db_command);
+		db_command.Format(L"UPDATE system_data SET cur_date = '%s' ", content);
+		access_sign = modify_db.DirectStatement(db_command);
 		if (!access_sign)
 		{
 			nReturn = -1;
@@ -521,30 +623,30 @@ int CG_SUB_InspectionDlg::database_operation(int mode_, CString content)
 	case -1:
 	{
 		db_command.Format(L"SELECT admin_pass1, admin_pass2 FROM system_data");
-		spl_wnd->db_status = spl_wnd->modify_db.Statement(db_command);
-		if (spl_wnd->db_status != NULL)
+		db_status = modify_db.Statement(db_command);
+		if (db_status != NULL)
 		{
-			while ((spl_wnd->db_status)->NextRow())
+			while ((db_status)->NextRow())
 			{
-				theApp.admin_pass[0] = (spl_wnd->db_status)->ValueString(0);
-				theApp.admin_pass[1] = (spl_wnd->db_status)->ValueString(1);
+				theApp.admin_pass[0] = (db_status)->ValueString(0);
+				theApp.admin_pass[1] = (db_status)->ValueString(1);
 			}
 		}
-		delete spl_wnd->db_status;
+		delete db_status;
 		break;
 	}
 	case 0://confirm selected model
 	{
 		db_command.Format(L"select count(*)  from sqlite_master where type='table' and name = '%s' ", content);
-		spl_wnd->db_status = spl_wnd->modify_db.Statement(db_command);
-		if (spl_wnd->db_status != NULL)
+		db_status = modify_db.Statement(db_command);
+		if (db_status != NULL)
 		{
-			while (spl_wnd->db_status->NextRow())
+			while (db_status->NextRow())
 			{
-				temp_int = _ttoi(spl_wnd->db_status->ValueString(0));
+				temp_int = _ttoi(db_status->ValueString(0));
 			}
 		}
-		delete spl_wnd->db_status;
+		delete db_status;
 		break;
 	}
 	case 1://create model table
@@ -553,7 +655,7 @@ int CG_SUB_InspectionDlg::database_operation(int mode_, CString content)
 		{
 			db_command.Format(L"CREATE TABLE '%s' ( \r\n 'i_index' TEXT, \r\n 'camera_index' TEXT, \r\n \
 			'contents_remarks' TEXT, \r\n 'image_file'	TEXT, \r\n 'ROI' TEXT, \r\n 'threshold' TEXT)", content);
-			access_sign = spl_wnd->modify_db.DirectStatement(db_command);
+			access_sign = modify_db.DirectStatement(db_command);
 			if (!access_sign)
 			{
 				nReturn = -1;
@@ -562,7 +664,7 @@ int CG_SUB_InspectionDlg::database_operation(int mode_, CString content)
 		}
 		db_command.Format(_T("INSERT INTO '%s' VALUES ( %d, %d, '%s', '%s', '%s', %.2f)  "),
 			content, newmodel_no, 0, L"nul", L"nul", L"nul", 0.75f);
-		access_sign = spl_wnd->modify_db.DirectStatement(db_command);
+		access_sign = modify_db.DirectStatement(db_command);
 		if (!access_sign)
 		{
 			nReturn = -1;
@@ -574,29 +676,29 @@ int CG_SUB_InspectionDlg::database_operation(int mode_, CString content)
 	{
 		CString db_content;
 		db_command.Format(L"SELECT * FROM %s", model_add);
-		spl_wnd->db_status = spl_wnd->modify_db.Statement(db_command);
-		if (spl_wnd->db_status != NULL)
+		db_status = modify_db.Statement(db_command);
+		if (db_status != NULL)
 		{
-			while (spl_wnd->db_status->NextRow())
+			while (db_status->NextRow())
 			{
-				db_content = spl_wnd->db_status->ValueString(0);
+				db_content = db_status->ValueString(0);
 				newmodel_no = _ttoi(db_content);
 				new_inspectcontent(hRoot, newmodel_no);
-				db_content = spl_wnd->db_status->ValueString(1);
+				db_content = db_status->ValueString(1);
 				plan_tree.SetItemText(subRoot, treeNode_str[1] + L": " + db_content);//camera_index
-				db_content = spl_wnd->db_status->ValueString(2);
+				db_content = db_status->ValueString(2);
 				plan_tree.SetItemText(subRoot1, treeNode_str[2] + L": " + db_content);//inspect_content
-				db_content = spl_wnd->db_status->ValueString(3);
+				db_content = db_status->ValueString(3);
 				int ind = db_content.ReverseFind('\\');
 				db_content = db_content.Mid(ind + 1);
 				plan_tree.SetItemText(subRoot2, treeNode_str[3] + L": " + db_content);//image_file
-				db_content = spl_wnd->db_status->ValueString(4);
+				db_content = db_status->ValueString(4);
 				plan_tree.SetItemText(subRoot3, treeNode_str[4] + L": " + db_content);//ROI
-				db_content = spl_wnd->db_status->ValueString(5);
+				db_content = db_status->ValueString(5);
 				plan_tree.SetItemText(subRoot4, treeNode_str[5] + L": " + db_content);//threshold
 			}
 		}
-		delete spl_wnd->db_status;
+		delete db_status;
 		break;
 	}
 	case 3://update selected model info
@@ -605,7 +707,7 @@ int CG_SUB_InspectionDlg::database_operation(int mode_, CString content)
 		temp_int = plan_tree.GetItemData(selected_item);
 		db_command.Format(L"UPDATE '%s' SET '%s' = '%s' WHERE i_index == %d",
 			model_add, title_str[temp_int], content, index_);
-		access_sign = spl_wnd->modify_db.DirectStatement(db_command);
+		access_sign = modify_db.DirectStatement(db_command);
 		if (!access_sign)
 		{
 			nReturn = -1;
@@ -616,18 +718,18 @@ int CG_SUB_InspectionDlg::database_operation(int mode_, CString content)
 	case 4:
 	{
 		db_command.Format(L"SELECT * FROM %s WHERE camera_index == %d", content, camera_index);
-		spl_wnd->db_status = spl_wnd->modify_db.Statement(db_command);
+		db_status = modify_db.Statement(db_command);
 		USES_CONVERSION;
-		if (spl_wnd->db_status != NULL)
+		if (db_status != NULL)
 		{
-			while (spl_wnd->db_status->NextRow())
+			while (db_status->NextRow())
 			{
 				temp_int = 0;
 				//contents remarks
-				temp_str = spl_wnd->db_status->ValueString(2);
+				temp_str = db_status->ValueString(2);
 				inspect_data[camera_index].contents_remarks.push_back(temp_str);
 				//image file
-				temp_str = spl_wnd->db_status->ValueString(3);
+				temp_str = db_status->ValueString(3);
 				char* file_name = T2A(temp_str.GetBuffer(0));
 				temp_str.ReleaseBuffer();
 				Mat temp_image = imread(file_name);
@@ -638,7 +740,7 @@ int CG_SUB_InspectionDlg::database_operation(int mode_, CString content)
 				//ROI
 				temp_int = 0;
 				Rect temp_rect;
-				temp_str = spl_wnd->db_status->ValueString(4);
+				temp_str = db_status->ValueString(4);
 				int* componts = new int[4];
 				temp_str = temp_str.Trim();
 				int index = temp_str.ReverseFind(',');
@@ -654,14 +756,36 @@ int CG_SUB_InspectionDlg::database_operation(int mode_, CString content)
 				temp_rect = Rect(componts[3], componts[2], componts[1], componts[0]);
 				inspect_data[camera_index].ROI.push_back(temp_rect);
 				//threshold
-				temp_str = spl_wnd->db_status->ValueString(5);
+				temp_str = db_status->ValueString(5);
 				inspect_data[camera_index].threshold.push_back(_ttof(temp_str));
 				delete[] componts;
 			}
 			inspect_data[camera_index].number = 
 				inspect_data[camera_index].contents_remarks.size();
 		}
-		delete spl_wnd->db_status;
+		delete db_status;
+		break;
+	}
+	case 5:
+	{
+		if (content == L"NULL")
+		{
+			db_command.Format(L"UPDATE system_data SET production_index = %d, \
+production_in = '%s', production_realtime = %d, production_NG = %d, inspect_complete = '%d' ", \
+0, content, 0, 0, inspect_complete);
+		}
+		else
+		{
+			db_command.Format(L"UPDATE system_data SET production_index = %d, \
+production_in = '%s', production_realtime = %d, production_NG = %d, inspect_complete = '%d'  ", \
+current_index, content, real_produce, ng_produce, inspect_complete);
+		}
+		access_sign = modify_db.DirectStatement(db_command);
+		if (!access_sign)
+		{
+			nReturn = -1;
+			return nReturn;
+		}
 		break;
 	}
 	default:
@@ -697,7 +821,7 @@ void CG_SUB_InspectionDlg::OnOK()
 			return;
 		}
 	}
-	if (mdy_md)
+	if (mdy_md | add_md)
 	{
 		func_btn.SetFocus();
 	}
@@ -765,6 +889,13 @@ void CG_SUB_InspectionDlg::functionarea_init(int mode_)
 		pswd_edt.ShowWindow(TRUE);
 		pswd_edt.SetFocus();
 		inquery_pswd = TRUE;
+		//
+		dynamic_info = L"请输入管理员密码";
+		CRect  EditRect;
+		pWnd = GetDlgItem(IDC_pswd);
+		pWnd->GetWindowRect(EditRect);
+		ScreenToClient(&EditRect);
+		create_edit(this, EditRect, dynamic_info, 1);
 		break;
 	}
 	case 2://add
@@ -776,6 +907,13 @@ void CG_SUB_InspectionDlg::functionarea_init(int mode_)
 		pWnd->SetWindowPos(NULL, mdl_sel.TopLeft().x, mdl_sel.TopLeft().y - 40,
 			mdl_sel.Width(), mdl_sel.Height() + 100, SWP_NOZORDER);
 		SetDlgItemText(IDC_plan_area, L"添加生产计划");
+		//
+		dynamic_info = L"请选择机种名称";
+		CRect  EditRect;
+		pWnd = GetDlgItem(IDC_model_sel);
+		pWnd->GetWindowRect(EditRect);
+		ScreenToClient(&EditRect);
+		create_edit(this, EditRect, dynamic_info, 1);
 		break;
 	}
 	case 3://chk
@@ -839,47 +977,63 @@ void CG_SUB_InspectionDlg::OnKillfocusEdit()
 			CFile::Rename(temp_str, mdy_data);
 			new_filesgn = FALSE;
 		}
-	}
-	if (tmp_node == L"相机编号")
-	{
-		int index_ = _ttoi(mdy_data);
-		if (index_ < 0)
+		if (tmp_node == L"相机编号")
 		{
-			index_ = 0;
-		}
-		if (index_ > MAX_CAMERA)
-		{
-			index_ = MAX_CAMERA;
-		}
-		if (index_ < MAX_CAMERA)
-		{
-			cam_data[index_].cam_web >> cam_data[index_].frame;
-			disp_image(IDC_inspec, cam_data[index_].frame, gsub_ins, CRect(0, 0, 100, 100), -1);
-			target_image = cam_data[index_].frame.clone();
+			int index_ = _ttoi(mdy_data);
+			if (index_ < 0)
+			{
+				index_ = 0;
+			}
+			if (index_ > MAX_CAMERA)
+			{
+				index_ = MAX_CAMERA;
+			}
+			if (index_ < MAX_CAMERA)
+			{
+				cam_data[index_].cam_web >> cam_data[index_].frame;
+				disp_image(IDC_inspec, cam_data[index_].frame, gsub_ins, CRect(0, 0, 100, 100), -1);
+				target_image = cam_data[index_].frame.clone();
+			}
+			else
+			{
+#pragma region Basler
+				cam_basler.StopGrabbing();
+				cam_basler.TriggerMode.SetValue(TriggerMode_On);
+				Sleep(200);
+				cam_basler.AcquisitionMode.SetValue(AcquisitionMode_Continuous);
+				cam_basler.StartGrabbing(GrabStrategy_OneByOne, GrabLoop_ProvidedByInstantCamera);
+				cam_basler.AcquisitionStart();
+				cam_basler.TriggerSource.SetValue(TriggerSource_SoftwareSignal1);
+				cam_basler.SoftwareSignalSelector.SetValue(SoftwareSignalSelector_SoftwareSignal1);
+				cam_basler.SoftwareSignalPulse.Execute();
+				Sleep(200);
+				cam_basler.StopGrabbing();
+				cam_basler.TriggerSource.SetValue(trigger_source);
+#pragma endregion
+				disp_image(IDC_inspec, basler_frame, gsub_ins, CRect(0, 0, 100, 100), -1);
+				target_image = basler_frame.clone();
+			}
+			clip_sgn = TRUE;
 		}
 		else
 		{
-			cam_basler.TriggerSource.SetValue(TriggerSource_SoftwareSignal1);
-			cam_basler.SoftwareSignalSelector.SetValue(SoftwareSignalSelector_SoftwareSignal1);
-			cam_basler.StartGrabbing(GrabStrategy_OneByOne, GrabLoop_ProvidedByInstantCamera);
-			cam_basler.SoftwareSignalPulse.Execute();
-			Sleep(100);
-			disp_image(IDC_inspec, basler_frame, gsub_ins, CRect(0, 0, 100, 100), -1);
-			target_image = basler_frame.clone();
-			cam_basler.TriggerSource.SetValue(TriggerSource_SoftwareSignal1);//TriggerSource_Line1
-			cam_basler.StopGrabbing();
+			load_sgn = TRUE;
+			clip_sgn = FALSE;
+			disp_image(IDC_inspec, paint_, gsub_ins, CRect(0, 0, 100, 100), -1);
 		}
-		clip_sgn = TRUE;
 	}
-	else if (tmp_node == L"计划生产量")
+	if (tmp_node == L"计划生产量")
 	{
 		plan_tree.SetItemData(selected_item, _ttoi(mdy_data));
-	}
-	else
-	{
-		load_sgn = TRUE;
-		clip_sgn = FALSE;
-		disp_image(IDC_inspec, paint_, gsub_ins, CRect(0, 0, 100, 100), -1);
+		CTime time(CTime::GetCurrentTime());
+		temp_str.Format(L"%04d-%02d-%02d-%02d-%02d-%02d", 
+			time.GetYear(),
+			time.GetMonth(),
+			time.GetDay(),
+			time.GetHour(),
+			time.GetMinute(),
+			time.GetSecond());
+		modify_history.push_back(temp_str);
 	}
 	m_Edit.DestroyWindow();
 	mdy_pln = FALSE;
@@ -931,7 +1085,6 @@ void CG_SUB_InspectionDlg::OnLButtonDown(UINT nFlags, CPoint point)
 		ScreenToClient(cwrect);
 	//	InvalidateRect(&cwrect, TRUE);
 	}
-
 	CDialogEx::OnLButtonDown(nFlags, point);
 }
 
@@ -945,9 +1098,13 @@ void CG_SUB_InspectionDlg::OnRButtonDown(UINT nFlags, CPoint point)
 		clip_sgn = FALSE;
 		USES_CONVERSION;
 		HTREEITEM temp_item;
-		temp_item = plan_tree.GetNextSiblingItem(selected_item);
-		temp_item = plan_tree.GetNextSiblingItem(temp_item);
+		temp_item = selected_item;
 		temp_str = plan_tree.GetItemText(temp_item);
+		while (temp_str.Mid(0,2) != L"图像")
+		{
+			temp_item = plan_tree.GetNextSiblingItem(temp_item);
+			temp_str = plan_tree.GetItemText(temp_item);
+		}
 		temp_int = temp_str.ReverseFind(':');
 		if (temp_int == -1)
 		{
@@ -978,10 +1135,9 @@ void CG_SUB_InspectionDlg::OnRButtonDown(UINT nFlags, CPoint point)
 		temp_filename = T2A(temp_str.GetBuffer(0));
 		temp_str.ReleaseBuffer();
 		Mat clip_image = target_image(cut_rect);
-		imwrite(temp_filename, clip_image);
+		cv::imwrite(temp_filename, clip_image);
 		//ROI
 		temp_item = plan_tree.GetNextSiblingItem(temp_item);
-		selected_item = temp_item;
 		temp_str = plan_tree.GetItemText(temp_item);
 		int size_ = temp_str.ReverseFind(':');
 		if (size_ != -1)
@@ -1011,8 +1167,10 @@ void CG_SUB_InspectionDlg::OnRButtonDown(UINT nFlags, CPoint point)
 			set_roi[3] = 1060 - set_roi[1];
 		}
 		roi_.Format(L"%d, %d, %d, %d", set_roi[0], set_roi[1], set_roi[2], set_roi[3]);
-		plan_tree.SetItemText(selected_item, temp_str + L": " + roi_);
+		plan_tree.SetItemText(temp_item, temp_str + L": " + roi_);
+		selected_item = temp_item;
 		database_operation(3, roi_);
+		selected_item = plan_tree.GetPrevSiblingItem(selected_item);
 		delete[] set_roi;
 	}
 	else
@@ -1021,6 +1179,7 @@ void CG_SUB_InspectionDlg::OnRButtonDown(UINT nFlags, CPoint point)
 		{
 			cam_basler.SoftwareSignalSelector.SetValue(SoftwareSignalSelector_SoftwareSignal1);
 			cam_basler.SoftwareSignalPulse.Execute();
+			Sleep(200);
 		}
 	}
 	CDialogEx::OnRButtonDown(nFlags, point);
@@ -1046,6 +1205,7 @@ void CG_SUB_InspectionDlg::OnLButtonUp(UINT nFlags, CPoint point)
 			if (MessageBox(L"是否删除所选条目内容 ?", L"Warning", MB_ICONWARNING | MB_OKCANCEL) == IDOK)
 			{
 				index_numbering(1);
+				mdy_pln = FALSE;
 			}
 			else
 			{
@@ -1144,15 +1304,24 @@ void CG_SUB_InspectionDlg::instruction_output()
 void CG_SUB_InspectionDlg::OnClose()
 {
 	// TODO: Add your message handler code here and/or call default
-	KillTimer(1);
-	for (int i = 0; i < MAX_CAMERA; i++)
-	{
-		cam_data[i].cam_web.release();
-	}
+	plan_tree.DeleteAllItems();
+	CWinThread* hThread = AfxBeginThread(ThreadFunc, (LPVOID)(LPCTSTR)0, THREAD_PRIORITY_NORMAL, 0, CREATE_SUSPENDED);
+	hThread->ResumeThread();
+	SetTimer(-2, 1500, NULL);
+	MessageBox(L"软件正在退出，请稍后...", L"系统信息", MB_OK | MB_ICONINFORMATION);
 	cam_basler.StopGrabbing();
 	delete[] cam_data;
 	delete[] inspect_data;
 	CDialogEx::OnCancel();
+}
+
+UINT CG_SUB_InspectionDlg::ThreadFunc(LPVOID pParam)
+{
+	for (int i = 0; i < MAX_CAMERA; i++)
+	{
+		gsub_ins->cam_data[i].cam_web.release();
+	}
+	return 0;
 }
 
 void CG_SUB_InspectionDlg::OnCancel()
@@ -1185,6 +1354,7 @@ int CG_SUB_InspectionDlg::planlist_ini(int mode_)
 	{
 		plan_tree.DeleteAllItems();
 		model_sel.GetWindowText(model_add);
+		model_sel.SetCurSel(-1);
 		if (!PathIsDirectory(L"model\\"+ model_add))
 		{
 			::CreateDirectory(L"model\\" + model_add, NULL);
@@ -1214,6 +1384,7 @@ int CG_SUB_InspectionDlg::planlist_ini(int mode_)
 	case 1://insert plan
 	{
 		model_sel.GetWindowText(model_add);
+		model_sel.SetCurSel(-1);
 		if (plan_tree.GetItemText(hRoot) != current_date)
 		{
 			hRoot = plan_tree.InsertItem(current_date, 0, 0, TVI_ROOT, TVI_LAST);
@@ -1226,8 +1397,11 @@ int CG_SUB_InspectionDlg::planlist_ini(int mode_)
 		plan_tree.SetItemData(subRoot2, 0);
 		subRoot3 = plan_tree.InsertItem(treeNode_str[2], 1, 1, subRoot, TVI_LAST);
 		plan_tree.SetItemData(subRoot3, 0);
+		subRoot4 = plan_tree.InsertItem(treeNode_str[3], 1, 1, subRoot, TVI_LAST);
+		plan_tree.SetItemData(subRoot4, 0);
 		plan_tree.Expand(hRoot, TVE_EXPAND);
 		plan_tree.Expand(subRoot, TVE_EXPAND);
+		plan_num++;
 		break;
 	}
 	case 2://check plan
@@ -1252,12 +1426,14 @@ int CG_SUB_InspectionDlg::planlist_ini(int mode_)
 			info_edit.SetWindowText(L"无法查询生产计划，请确认日期正确。\
 \r\n或添加当日生产计划。");
 			hRoot = plan_tree.InsertItem(current_date, 0, 0, TVI_ROOT, TVI_LAST);
+			current_index = 1;
 			nReturn = -1;
 		}
 		else
 		{
 			queryTreeNode(plan_tree, hRoot, temp_str);
 		}
+		database_operation(5, L"none");
 		break;
 	}
 	case 3://check dat
@@ -1265,7 +1441,7 @@ int CG_SUB_InspectionDlg::planlist_ini(int mode_)
 		CString temp_;
 		plan_tree.DeleteAllItems();
 		datepick.GetWindowText(temp_);
-		temp_str.Format(L"temp\\error\\" + temp_ + L".ini");
+		temp_str.Format(L"temp\\error\\data\\" + temp_ + L".ini");
 
 		USES_CONVERSION;
 		char* file_nme = T2A(temp_str.GetBuffer(0));
@@ -1283,28 +1459,34 @@ int CG_SUB_InspectionDlg::planlist_ini(int mode_)
 	}
 	case 4://save plan
 	{
-		UINT fileSum = 0;
-		int layer = 1;
-		CString appPathFile;
-		appPathFile.Format(L"temp\\plan\\" + theApp.currentTime + L".ini");//plan_tree.GetItemText(hRoot)
-		unsigned short int sUnicodeFlag = 0xfeff;
-		FILE *fp;
-		fp = _wfopen(appPathFile, _T("wb"));
-		fwrite(&sUnicodeFlag, sizeof(short int), 1, fp);
-		fclose(fp);
-		recordTreeNode(plan_tree, hRoot, fileSum, layer, appPathFile);
-		//
-		CString _str;
-		_str.Format(L"%d", fileSum);
-		WritePrivateProfileString(L"INFO", L"filesum", _str, appPathFile);
+		if (plan_tree.ItemHasChildren(hRoot))
+		{
+			UINT fileSum = 0;
+			int layer = 1;
+			CString appPathFile;
+			appPathFile.Format(L"temp\\plan\\" + current_date + L".ini");
+			unsigned short int sUnicodeFlag = 0xfeff;
+			FILE *fp;
+			fp = _wfopen(appPathFile, _T("wb"));
+			fwrite(&sUnicodeFlag, sizeof(short int), 1, fp);
+			fclose(fp);
+			recordTreeNode(plan_tree, hRoot, fileSum, layer, appPathFile);
+			//
+			CString _str;
+			_str.Format(L"%d", fileSum);
+			WritePrivateProfileString(L"INFO", L"filesum", _str, appPathFile);
+			for (int i = 0; i < modify_history.size(); i++)
+			{
+				_str.Format(L"Modified");
+				WritePrivateProfileString(L"Modify", modify_history[i], _str,
+					L"temp\\plan\\" + current_date + L".ini");
+			}
+		}
 		break;
 	}
-
 	default:
 		break;
 	}
-
-
 	return nReturn;
 }
 
@@ -1413,10 +1595,11 @@ void CG_SUB_InspectionDlg::OnPlanmenu1addpln()
 	}
 	add_pln = TRUE;
 	delete[] treeNode_str;
-	treeNode_str = new CString[3];
+	treeNode_str = new CString[4];
 	treeNode_str[0] = L"计划生产量";
 	treeNode_str[1] = L"实际生产量";
 	treeNode_str[2] = L"NG发生率";
+	treeNode_str[3] = L"检查状态";
 	if (!pswd_state)
 	{
 		functionarea_init(1);
@@ -1579,6 +1762,13 @@ void CG_SUB_InspectionDlg::OnPlanmenu1addcontent()
 	}
 }
 
+//Export Check-out Data
+void CG_SUB_InspectionDlg::OnPlanmenu1export()
+{
+	// TODO: Add your command handler code here
+
+}
+
 //Modify  Data in the Tree Ctrl
 void CG_SUB_InspectionDlg::OnPlanmenu2modpln()
 {
@@ -1627,7 +1817,7 @@ void CG_SUB_InspectionDlg::queryTreeNode(CTreeCtrl& m_tree, HTREEITEM& hTreeItem
 	HTREEITEM m_htreeItem = TVI_ROOT;// TVI_ROOT;
 	HTREEITEM m_ntreeItem = TVI_ROOT;
 	//------------------
-	plan_num = 0;
+	plan_num = 1;
 	int _fileSum = GetPrivateProfileInt(L"INFO", L"filesum", NULL, appPathFile);
 	for (int i = 0; i < _fileSum; i++)
 	{
@@ -1640,6 +1830,13 @@ void CG_SUB_InspectionDlg::queryTreeNode(CTreeCtrl& m_tree, HTREEITEM& hTreeItem
 		strNode = inBuf;
 		GetPrivateProfileString(L"NODE" + _str, L"id", NULL, inBuf, 255, appPathFile);
 		_id = _ttoi(inBuf);
+		if (strNode.Mid(0, 2) == L"实际")
+		{
+			if (_id == 0)
+			{
+				current_index = plan_num;
+			}
+		}
 		if (rec_layer == 1)//root
 		{
 			hTreeItem = m_tree.InsertItem(strNode, 0, 0);
@@ -1689,13 +1886,16 @@ int CG_SUB_InspectionDlg::index_numbering(int mode_)
 	{
 	case 0:
 	{
-		int index_ = 0;
+		plan_num = 1;
 		temp_item = plan_tree.GetChildItem(hRoot);
 		while (temp_item != NULL)
 		{
-			plan_tree.SetItemData(temp_item, index_);
+			if (plan_tree.GetItemData(temp_item) != -1)
+			{
+				plan_tree.SetItemData(temp_item, plan_num);
+				plan_num++;
+			}
 			temp_item = plan_tree.GetNextSiblingItem(temp_item);
-			index_++;
 		}
 		break;
 	}
@@ -1767,34 +1967,63 @@ void CG_SUB_InspectionDlg::new_inspectcontent(HTREEITEM hRoot, int& newmodel_no)
 }
 
 //Dynamiclly Create Edit Ctrl
-void CG_SUB_InspectionDlg::create_edit(CWnd* ctrl, CRect  EditRect, CString contents_reserved)
+void CG_SUB_InspectionDlg::create_edit(CWnd* ctrl, CRect  EditRect, CString contents_reserved, int mode_)
 {
-	m_Edit.Create(ES_AUTOHSCROLL | WS_CHILD | ES_LEFT | ES_WANTRETURN,
-		CRect(0, 0, 0, 0), this, IDC_crtd_EDIT);
-	m_Edit.SetFont(this->GetFont(), FALSE);
-	m_Edit.SetParent(ctrl);//&plan_tree
-	int index = contents_reserved.ReverseFind(':');
-	if (index != -1)
+	switch (mode_)
 	{
-		contents_reserved = contents_reserved.Mid(index + 2);
-	}
-	else
+	case 0:
 	{
-		contents_reserved = L" ";
-	}
-	EditRect.SetRect(EditRect.left + EditRect.Width() + 10, EditRect.top + 1,
-		EditRect.right + EditRect.Width() + 10, EditRect.bottom - 1);
+		m_Edit.Create(ES_AUTOHSCROLL | WS_CHILD | ES_LEFT | ES_WANTRETURN,
+			CRect(0, 0, 0, 0), this, IDC_crtd_EDIT);
+		m_Edit.SetFont(this->GetFont(), FALSE);
+		m_Edit.SetParent(ctrl);//&plan_tree
+		int index = contents_reserved.ReverseFind(':');
+		if (index != -1)
+		{
+			contents_reserved = contents_reserved.Mid(index + 2);
+		}
+		else
+		{
+			contents_reserved = L" ";
+		}
+		EditRect.SetRect(EditRect.left + EditRect.Width() + 10, EditRect.top + 1,
+			EditRect.right + EditRect.Width() + 10, EditRect.bottom - 1);
 
-	m_Edit.MoveWindow(&EditRect);
-	m_Edit.SetWindowText(contents_reserved);
-	m_Edit.ShowWindow(SW_SHOW);
-	m_Edit.SetFocus();
-	m_Edit.SetSel(0, -1);
+		m_Edit.MoveWindow(&EditRect);
+		m_Edit.SetWindowText(contents_reserved);
+		m_Edit.ShowWindow(SW_SHOW);
+		m_Edit.SetFocus();
+		m_Edit.SetSel(0, -1);
+		break;
+	}
+	case 1:
+	{
+		m_Info.Create(ES_AUTOHSCROLL | WS_CHILD | ES_LEFT | ES_WANTRETURN | ES_READONLY,
+			CRect(0, 0, 0, 0), this, IDC_crtd_INFO);
+		m_Info.SetFont(this->GetFont(), FALSE);
+		m_Edit.SetParent(ctrl);
+		EditRect.SetRect(EditRect.TopLeft().x, EditRect.TopLeft().y + EditRect.Height() + 5,
+			EditRect.BottomRight().x, EditRect.BottomRight().y + EditRect.Height() + 5);
+		m_Info.MoveWindow(&EditRect);
+		m_Info.SetWindowText(contents_reserved);
+		m_Info.ShowWindow(SW_SHOW);
+		break;
+	}
+	default:
+		break;
+	}
 }
 
 //Get Current Production Info
-void CG_SUB_InspectionDlg::get_produceinfo(HTREEITEM model)
+BOOL CG_SUB_InspectionDlg::get_produceinfo(HTREEITEM model)
 {
+	database_operation(0, current_model);
+	if (temp_int == 0)
+	{
+		SetTimer(-2, 800, NULL);
+		MessageBox(L"数据库中没有该机种信息，请重新添加。", L"提示信息", MB_OK | MB_ICONINFORMATION);
+		return FALSE;
+	}
 	for (int i = 0; i < MAX_CAMERA + 1; i++)
 	{
 		camera_index = i;
@@ -1807,16 +2036,24 @@ void CG_SUB_InspectionDlg::get_produceinfo(HTREEITEM model)
 	subRoot = plan_tree.GetChildItem(model);
 	subRoot1 = plan_tree.GetNextSiblingItem(subRoot);
 	subRoot2 = plan_tree.GetNextSiblingItem(subRoot1);
+	subRoot3 = plan_tree.GetNextSiblingItem(subRoot2);
 	plan_produce = plan_tree.GetItemData(subRoot);
+	current_index = plan_tree.GetItemData(model);
+	real_produce = plan_tree.GetItemData(subRoot1);
+	ng_produce = plan_tree.GetItemData(subRoot2);
 	delete[] treeNode_str;
-	treeNode_str = new CString[3];
+	treeNode_str = new CString[4];
 	treeNode_str[0] = L"计划生产量";
 	treeNode_str[1] = L"实际生产量";
 	treeNode_str[2] = L"NG发生率";
-	plan_tree.SetItemText(subRoot1, treeNode_str[1] + L": 0");
-	plan_tree.SetItemText(subRoot2, treeNode_str[2] + L": 0");
-	real_produce = 0;
-	ng_produce = 0;
+	treeNode_str[3] = L"检查状态";
+	temp_str.Format(L": %d", real_produce);
+	plan_tree.SetItemText(subRoot1, treeNode_str[1] + temp_str);
+	temp_str.Format(L": %d", ng_produce);
+	plan_tree.SetItemText(subRoot2, treeNode_str[2] + temp_str);
+	temp_str.Format(L": %s", L"未完成");
+	plan_tree.SetItemText(subRoot3, treeNode_str[3] + temp_str);
+	return TRUE;
 }
 #pragma endregion
 
@@ -1833,7 +2070,7 @@ int CG_SUB_InspectionDlg::camera_initialization()
 	frame_width = _ttoi(temp_str);
 	temp_str = ini_parser.GetValue("Camera", L"frame_height", size_);
 	frame_height = _ttoi(temp_str);
-	for (int i = 0; i < 1; i++)//MAX_CAMERA
+	for (int i = 0; i < MAX_CAMERA; i++)//MAX_CAMERA
 	{
 		cam_data[i].camera_index = i;
 		temp_str = ini_parser.GetValue("Camera", L"focus", size_);
@@ -1857,6 +2094,7 @@ int CG_SUB_InspectionDlg::camera_initialization()
 			}
 		}
 	}
+	SetTimer(1, 100, NULL);
 	/*Basler Camera*/
 	CTlFactory& TlFactory = CTlFactory::GetInstance();// Get the transport layer factory.
 	if (TlFactory.EnumerateDevices(devices_list) == 0)
@@ -1873,32 +2111,32 @@ int CG_SUB_InspectionDlg::camera_initialization()
 	else
 	{
 		//create device
-		cam_basler.Attach(TlFactory.CreateFirstDevice()); // TlFactory.CreateDevice(devices_list[0])
+		cam_basler.Attach(TlFactory.CreateFirstDevice());
 		cam_basler.RegisterConfiguration(new CAcquireContinuousConfiguration, 
 			RegistrationMode_ReplaceAll, Ownership_TakeOwnership);
 		cam_basler.RegisterImageEventHandler(this, RegistrationMode_Append, 
 			Ownership_ExternalOwnership);
-		
 		cam_basler.Open();
 		cam_basler.AcquisitionMode.SetValue(AcquisitionMode_Continuous);
 		// Carry out luminance control by using the "continuous" gain auto function.
 		AutoGainContinuous(cam_basler);
 		// Carry out luminance control by using the "continuous" exposure auto function.
 		AutoExposureContinuous(cam_basler);
-		cam_basler.TriggerSource.SetValue(TriggerSource_SoftwareSignal1);//TriggerSource_Line1
+		temp_str = ini_parser.GetValue("Basler Camera", L"trigger_source", size_);
+		trigger_source = (TriggerSourceEnums)_ttoi(temp_str);
+		cam_basler.TriggerSource.SetValue(trigger_source);
 		cam_basler.TriggerMode.SetValue(TriggerMode_Off);
 		converter.OutputPixelFormat = PixelType_Mono8;
 		cam_basler.Width.SetValue(frame_width);
 		cam_basler.Height.SetValue(frame_height);
 		cam_basler.CenterX.SetValue(TRUE);
 		cam_basler.CenterY.SetValue(TRUE);
-		
+		//
 		cam_basler.StartGrabbing(GrabStrategy_OneByOne, GrabLoop_ProvidedByInstantCamera);
 		SetTimer(-2, 1200, NULL);
 		MessageBox(L"相机初始化中，请稍后...", L"提示信息", MB_ICONINFORMATION | MB_OK);
 	}
 	ini_parser.Clear();
-	SetTimer(1, 100, NULL);
 	return nReturn;
 }
 
@@ -2032,6 +2270,7 @@ void CG_SUB_InspectionDlg::OnImageGrabbed(CInstantCamera& camera_basler,
 			for (int m = 0; m < MAX_CAMERA; m++)
 			{
 				cam_data[m].cam_web >> cam_data[m].frame;
+				cam_data[m].cam_web >> cam_data[m].frame;
 				camera_index = m;
 				for (int n = 0; n < inspect_data[m].number; n++)
 				{
@@ -2056,29 +2295,56 @@ void CG_SUB_InspectionDlg::OnImageGrabbed(CInstantCamera& camera_basler,
 				real_produce++;
 				temp_str.Format(L": %d", real_produce);
 				plan_tree.SetItemText(subRoot1, treeNode_str[1] + temp_str);
+				plan_tree.SetItemData(subRoot1, real_produce);
 			}
 			else
 			{
 				ng_produce++;
 				temp_str.Format(L": %d", ng_produce);
 				plan_tree.SetItemText(subRoot2, treeNode_str[2] + temp_str);
+				plan_tree.SetItemData(subRoot2, ng_produce);
 			}
 			//change model
 			if (real_produce == plan_produce)
 			{
+				load_sgn = TRUE;
+				disp_image(IDC_inspec, paint_, gsub_ins, CRect(0, 0, 100, 100));
+				plan_tree.SetItemData(selected_item, -1);
+				plan_tree.SetItemText(subRoot3, treeNode_str[3] + L": 已完成");
+				plan_tree.SetItemData(subRoot3, 1);
 				selected_item = plan_tree.GetNextSiblingItem(selected_item);
 				if (selected_item != NULL)
 				{
-					get_produceinfo(selected_item);
-				}
-				else
-				{
-					if (MessageBox(L"生产计划已完成。", L"提示信息", MB_OKCANCEL | MB_ICONINFORMATION) == IDOK)
+					current_model = plan_tree.GetItemText(selected_item);
+					temp_str.Format(L"机种变更: %s\r\n请注意确认。", current_model);
+					if (MessageBox(temp_str, L"机种变更确认", MB_OKCANCEL | MB_ICONQUESTION) == IDOK)
+					{
+						get_produceinfo(selected_item);
+						real_produce = 0;
+						ng_produce = 0;
+						database_operation(5, current_model);
+					}
+					else
 					{
 						//stop inspecting
 						OnBnClickedfuncbutton();
 					}
 				}
+				else
+				{
+					if (MessageBox(L"生产计划已完成。", L"提示信息", MB_OK | MB_ICONINFORMATION) == IDOK)
+					{
+						//stop inspecting
+						inspect_complete = TRUE;
+						database_operation(5, L"NULL");
+						OnBnClickedfuncbutton();
+					}
+				}
+			}
+			else//update infomation
+			{
+				database_operation(5, current_model);
+				planlist_ini(4);
 			}
 		}
 	}
@@ -2186,7 +2452,7 @@ BOOL CG_SUB_InspectionDlg::Inspect_function(int index_, Mat template_img,
 			err_date, inspect_data[camera_index].contents_names[index_]);
 		err_msg = T2A(temp_str.GetBuffer(0));
 		temp_str.ReleaseBuffer();
-		imwrite(err_msg, ori_image);
+		cv::imwrite(err_msg, ori_image);
 		//data
 		record_errormessage(err_date, err_text, error_datafile);
 	}
@@ -2212,7 +2478,7 @@ void CG_SUB_InspectionDlg::record_errormessage(CString value1, CString value2,
 	if (_access(temp_filename, 0) == -1)
 	{
 		spl_wnd->wr_unicodefile(file_path);
-		WritePrivateProfileString(L"Node0", L"name", current_date, file_path);
+		WritePrivateProfileString(L"Node0", L"name", current_date + L"Error", file_path);
 		WritePrivateProfileString(L"Node0", L"index", L"0", file_path);
 		WritePrivateProfileString(L"Node0", L"id", L"0", file_path);
 		WritePrivateProfileString(L"Node0", L"layer", L"1", file_path);
@@ -2225,15 +2491,16 @@ void CG_SUB_InspectionDlg::record_errormessage(CString value1, CString value2,
 	}
 	node_.Format(L"Node" + num_);
 	WritePrivateProfileString(node_, L"name", value1, file_path);
-	WritePrivateProfileString(node_, L"index", L"7", file_path);
+	WritePrivateProfileString(node_, L"index", num_, file_path);
 	WritePrivateProfileString(node_, L"id", L"0", file_path);
 	WritePrivateProfileString(node_, L"layer", L"2", file_path);
 	node_.Format(L"Node%d", _ttoi(num_) + 1);
+	num_.Format(L"%d", _ttoi(num_) + 1);
 	WritePrivateProfileString(node_, L"name", value2, file_path);
-	WritePrivateProfileString(node_, L"index", L"8", file_path);
+	WritePrivateProfileString(node_, L"index", num_, file_path);
 	WritePrivateProfileString(node_, L"id", L"0", file_path);
 	WritePrivateProfileString(node_, L"layer", L"3", file_path);
-	num_.Format(L"%d", _ttoi(num_) + 2);
+	num_.Format(L"%d", _ttoi(num_) + 1);
 	WritePrivateProfileString(L"INFO", L"filesum", num_, file_path);
 }
 #pragma endregion

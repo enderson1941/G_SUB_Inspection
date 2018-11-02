@@ -3,6 +3,7 @@
 //
 
 #pragma once
+//System
 #include "afxwin.h"
 #include "afxcmn.h"
 #include "afxdtctl.h"
@@ -18,6 +19,11 @@
 #include "utility"
 #include "fstream"
 #include "io.h"
+#include "algorithm"
+#include "INIParser.h"
+#include "map"
+#include "DbSqlite.h"
+
 //OpenCV
 #include "opencv2/opencv_modules.hpp"
 #include "opencv2/core/ocl.hpp"
@@ -29,19 +35,18 @@
 #include "opencv2/imgcodecs.hpp"
 #include "opencv2/core/core.hpp"
 #include "opencv2/photo/photo.hpp"
-#include "algorithm"
-#include "INIParser.h"
-#include "map"
-#include "DbSqlite.h"
 
 //Basler
 #include <pylon/PylonIncludes.h>
 #ifdef PYLON_WIN_BUILD
 #    include <pylon/PylonGUI.h>
 #endif
-//#include "pylon/gige/_BaslerGigECameraParams.h"
-//#include "pylon/gige/BaslerGigECamera.h"
-//#include "pylon/gige/BaslerGigEInstantCamera.h"
+
+#include "pylon/gige/_BaslerGigECameraParams.h"
+#include "pylon/gige/BaslerGigECamera.h"
+#include "pylon/gige/BaslerGigEInstantCamera.h"
+#include "pylon/usb/BaslerUsbCamera.h"
+#include "pylon/usb/BaslerUsbInstantCamera.h"
 #include "pylon/ImageEventHandler.h"
 #include "ImageEventPrinter.h"
 #include "pylon/TransportLayer.h"
@@ -51,9 +56,6 @@
 #include "pylon/ImagePersistence.h"
 #include "pylon/PylonBase.h"
 #include "pylon/ImageFormatConverter.h"
-#include "pylon/GrabResultPtr.h"
-#include "pylon/usb/BaslerUsbCamera.h"
-#include "pylon/usb/BaslerUsbInstantCamera.h"
 
 using namespace std;
 using namespace cv;
@@ -94,10 +96,11 @@ protected:
 
 	// Generated message map functions
 	virtual BOOL OnInitDialog();
+	static UINT ThreadFunc(LPVOID pParam);
+
 	afx_msg void OnSysCommand(UINT nID, LPARAM lParam);
 	afx_msg void OnPaint();
 	afx_msg HCURSOR OnQueryDragIcon();
-
 	DECLARE_MESSAGE_MAP()
 public:
 //	typedef CBaslerGigEInstantCamera Camera_basler;
@@ -128,6 +131,7 @@ public:
 	//basler camera
 	Camera_basler	cam_basler;
 	DeviceInfoList_t devices_list;
+	TriggerSourceEnums trigger_source;
 	CPylonImage	targetImage;
 	CImageFormatConverter converter;
 	CGrabResultPtr ptrGrabResult_basler;
@@ -137,8 +141,9 @@ public:
 	int ng_produce = 0;
 	int temp_int = 0;
 	int temp_index = 0;
+	int current_index = 1;
 	int newmodel_no = 1;
-	int plan_num = 0;
+	int plan_num = 1;
 	int frame_width;
 	int frame_height;
 	int camera_index = -1;
@@ -160,20 +165,22 @@ public:
 	BOOL m_bIsDrag = FALSE;
 	BOOL clip_sgn = FALSE;
 	BOOL new_filesgn = FALSE;
+	BOOL inspect_complete = FALSE;
 	CString error_message;
 	CString model_add;
 	CString temp_str;
 	CString mdy_data;
 	CString current_date;
 	CString current_model;
-	CString db_command;
 	CString clip_filepath;
 	CString error_imagefile;
 	CString error_datafile;
+	CString dynamic_info;
 	CString* treeNode_str;
 	CString* title_str;
 	CImageList* m_pImageList;
 	vector<CString> strVecAccount;
+	vector<CString> modify_history;
 	
 	Mat paint_ = Mat(1024, 1280, CV_8UC3, Scalar::all(240));
 	Mat basler_frame;
@@ -201,7 +208,10 @@ public:
 	CEdit pswd_edt;
 	CEdit info_edit;
 	CEdit m_Edit;
+	CEdit m_Info;
 	CStatic inspec_pic;
+	CDbSQLite modify_db;
+	CSqlStatement* db_status;
 	CDateTimeCtrl datepick;
 	CComboBox model_sel;
 
@@ -213,11 +223,10 @@ public:
 	void recordTreeNode(CTreeCtrl& m_tree, HTREEITEM hTreeItem,	UINT& fileSum, 
 		int& layer, CString appPathFile);
 	void queryTreeNode(CTreeCtrl& m_tree, HTREEITEM& hTreeItem, CString appPathFile);
-	void get_produceinfo(HTREEITEM model);
 	void OnKillfocusEdit();
 	void functionarea_init(int mode_);
 	void instruction_output();
-	void create_edit(CWnd* ctrl, CRect  EditRect, CString contents_reserved);
+	void create_edit(CWnd* ctrl, CRect  EditRect, CString contents_reserved, int mode_ = 0);
 	void disp_image(UINT disp_ID, Mat dsp_img, CWnd* pt, CRect& img_rect, int cam_index = 0);
 	void new_inspectcontent(HTREEITEM hRoot, int& newmodel_no);
 	void AutoGainContinuous(Camera_basler& camera_basler);
@@ -226,6 +235,7 @@ public:
 	virtual void OnOK();
 	virtual void OnCancel();
 
+	BOOL get_produceinfo(HTREEITEM model);
 	BOOL Inspect_function(int index_, Mat template_img, Mat& inspect_img, Rect ROI, double& threshold);
 
 	afx_msg void OnClose();
@@ -247,6 +257,7 @@ public:
 	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
 	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
 	afx_msg void OnRButtonDown(UINT nFlags, CPoint point);
+	afx_msg void OnPlanmenu1export();
 };
 
 // ClxTreeCtrl
