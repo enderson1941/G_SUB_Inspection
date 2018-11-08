@@ -61,6 +61,7 @@ Debug
 ipch
 model
 Release/temp
+Release/*.1.tlog
 
 # Executables
 *.iobj
