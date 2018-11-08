@@ -61,7 +61,8 @@ Debug
 ipch
 model
 Release/temp
-Release/*.1.tlog
+Release/G_SUB_Inspection.tlog
+
 
 # Executables
 *.iobj
