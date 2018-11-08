@@ -60,6 +60,7 @@ opencv_world300.dll
 Debug
 ipch
 model
+Release/temp
 
 # Executables
 *.iobj
