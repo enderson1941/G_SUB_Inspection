@@ -28,6 +28,7 @@ public:
 	char* database_file;
 	char* modelList_file;
 	CString Currentdir_;
+	CString Desktopdir_;
 	CString currentTime;
 	CString admin_pass[2];
 	std::vector<CString> model_;

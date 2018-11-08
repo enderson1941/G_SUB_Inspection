@@ -48,6 +48,10 @@ BOOL SplashWnd::OnInitDialog()
 	{
 		SetCurrentDirectory(L"..");
 	}
+	//
+	TCHAR szPath[MAX_PATH];
+	SHGetSpecialFolderPath(0, szPath, CSIDL_DESKTOPDIRECTORY, 0);
+	theApp.Desktopdir_ = szPath;
 #pragma region folder_create
 	if (!PathIsDirectory(L"database"))
 	{
@@ -160,7 +164,7 @@ BOOL SplashWnd::OnInitDialog()
 		ini_parser.SetValue("Basler Camera", L"frame_width", _str);
 		_str.Format(L"1080");
 		ini_parser.SetValue("Basler Camera", L"frame_height", _str);
-		_str.Format(L"5");
+		_str.Format(L"1");
 		ini_parser.SetValue("Basler Camera", L"trigger_source", _str);
 		//
 		ini_parser.WriteINI(theApp.camera_file);

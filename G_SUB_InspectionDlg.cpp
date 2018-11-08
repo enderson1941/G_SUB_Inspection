@@ -183,7 +183,7 @@ BOOL CG_SUB_InspectionDlg::OnInitDialog()
 	initialize_sgn = TRUE;
 
 	//camera initialization
-	camera_initialization();
+	//camera_initialization();
 
 	COLORREF oldColor = RGB(240, 240, 240);
 	plan_tree.SetBkColor(oldColor);
@@ -298,9 +298,11 @@ void CG_SUB_InspectionDlg::OnBnClickedfuncbutton()
 			cam_basler.TriggerMode.SetValue(TriggerMode_On);
 			cam_basler.TriggerActivation.SetValue(TriggerActivation_RisingEdge);
 			cam_basler.TriggerSelector.SetValue(TriggerSelector_FrameStart);
-			cam_basler.TriggerDelay.SetValue(635000);//635000
+		//	cam_basler.TriggerDelay.SetValue(635000);//635000
+			cam_basler.TriggerDelayAbs.SetValue(635000);
 			cam_basler.AcquisitionMode.SetValue(AcquisitionMode_Continuous);
-			cam_basler.StartGrabbing(GrabStrategy_OneByOne, GrabLoop_ProvidedByInstantCamera);
+			cam_basler.StartGrabbing(GrabStrategy_OneByOne, 
+				GrabLoop_ProvidedByInstantCamera);
 			cam_basler.AcquisitionStart();
 			Sleep(200);
 #pragma endregion
@@ -323,8 +325,8 @@ void CG_SUB_InspectionDlg::OnBnClickedfuncbutton()
 #pragma endregion
 			inspect_sgn = TRUE;
 			m_hIcon = NULL;
-			m_hIcon = (HICON)LoadImage(AfxGetApp()->m_hInstance, MAKEINTRESOURCE(IDI_ICON3),
-				IMAGE_ICON, 40, 40, LR_DEFAULTCOLOR);
+			m_hIcon = (HICON)LoadImage(AfxGetApp()->m_hInstance, 
+				MAKEINTRESOURCE(IDI_ICON3), IMAGE_ICON, 40, 40, LR_DEFAULTCOLOR);
 			func_btn.SetIcon(m_hIcon);
 			func_btn.SetWindowText(L"停止\r\n检测");
 		}
@@ -336,8 +338,8 @@ void CG_SUB_InspectionDlg::OnBnClickedfuncbutton()
 		inspect_sgn = FALSE;
 		inspect_complete = FALSE;
 		m_hIcon = NULL;
-		m_hIcon = (HICON)LoadImage(AfxGetApp()->m_hInstance, MAKEINTRESOURCE(IDI_ICON4),
-			IMAGE_ICON, 40, 40, LR_DEFAULTCOLOR);
+		m_hIcon = (HICON)LoadImage(AfxGetApp()->m_hInstance, 
+			MAKEINTRESOURCE(IDI_ICON4), IMAGE_ICON, 40, 40, LR_DEFAULTCOLOR);
 		func_btn.SetIcon(m_hIcon);
 		func_btn.SetWindowText(L"开始\r\n检测");
 		plan_tree.DeleteAllItems();
@@ -530,7 +532,7 @@ void CG_SUB_InspectionDlg::OnEnChangepswd()
 	}
 	else
 	{
-		if (pswd_text == theApp.admin_pass[0])
+		if (pswd_text == theApp.admin_pass[0] || pswd_text == theApp.admin_pass[1])
 		{
 			pswd_state = TRUE;
 			pswd_edt.SetWindowText(NULL);
@@ -940,6 +942,7 @@ void CG_SUB_InspectionDlg::OnCbnSelchangemodelsel()
 	// TODO: Add your control notification handler code here
 	if (add_md)
 	{
+		newmodel_no = 1;
 		planlist_ini(-1);
 	}
 	else
@@ -1004,9 +1007,11 @@ void CG_SUB_InspectionDlg::OnKillfocusEdit()
 				cam_basler.AcquisitionMode.SetValue(AcquisitionMode_Continuous);
 				cam_basler.StartGrabbing(GrabStrategy_OneByOne, GrabLoop_ProvidedByInstantCamera);
 				cam_basler.AcquisitionStart();
-				cam_basler.TriggerSource.SetValue(TriggerSource_SoftwareSignal1);
+				cam_basler.TriggerSource.SetValue(TriggerSource_Software);
+				cam_basler.TriggerSoftware.Execute();
+				/*cam_basler.TriggerSource.SetValue(TriggerSource_SoftwareSignal1);
 				cam_basler.SoftwareSignalSelector.SetValue(SoftwareSignalSelector_SoftwareSignal1);
-				cam_basler.SoftwareSignalPulse.Execute();
+				cam_basler.SoftwareSignalPulse.Execute();*/
 				Sleep(200);
 				cam_basler.StopGrabbing();
 				cam_basler.TriggerSource.SetValue(trigger_source);
@@ -1178,9 +1183,9 @@ void CG_SUB_InspectionDlg::OnRButtonDown(UINT nFlags, CPoint point)
 	{
 		if (cam_basler.IsPylonDeviceAttached())
 		{
-			cam_basler.SoftwareSignalSelector.SetValue(SoftwareSignalSelector_SoftwareSignal1);
+			/*cam_basler.SoftwareSignalSelector.SetValue(SoftwareSignalSelector_SoftwareSignal1);
 			cam_basler.SoftwareSignalPulse.Execute();
-			Sleep(200);
+			Sleep(200);*/
 		}
 	}
 	CDialogEx::OnRButtonDown(nFlags, point);
@@ -1307,19 +1312,22 @@ void CG_SUB_InspectionDlg::OnClose()
 	// TODO: Add your message handler code here and/or call default
 	KillTimer(1);
 	plan_tree.DeleteAllItems();
-	for (int i = 0; i < MAX_CAMERA; i++)
+	if (cam_initializesign)
 	{
-		if (cam_data[i].cam_web.isOpened())
+		for (int i = 0; i < MAX_CAMERA; i++)
 		{
-			cam_data[i].cam_web.release();
+			if (cam_data[i].cam_web.isOpened())
+			{
+				cam_data[i].cam_web.release();
+			}
 		}
+		if (cam_basler.IsPylonDeviceAttached())
+		{
+			cam_basler.StopGrabbing();
+		}
+		delete[] cam_data;
+		delete[] inspect_data;
 	}
-	if (cam_basler.IsPylonDeviceAttached())
-	{
-		cam_basler.StopGrabbing();
-	}
-	delete[] cam_data;
-	delete[] inspect_data;
 	CDialogEx::OnCancel();
 }
 
@@ -1327,7 +1335,8 @@ void CG_SUB_InspectionDlg::OnCancel()
 {
 	// TODO: Add your specialized code here and/or call the base class
 	SetTimer(-2, 800, NULL);
-	MessageBox(L"程序正在退出，请稍后...", L"提示信息", MB_OKCANCEL | MB_ICONINFORMATION);
+	MessageBox(L"程序正在退出，请稍后...", L"提示信息", 
+		MB_OKCANCEL | MB_ICONINFORMATION);
 	OnClose();
 }
 #pragma endregion
@@ -1752,6 +1761,7 @@ void CG_SUB_InspectionDlg::OnPlanmenu1addcontent()
 			info_edit.SetWindowText(L"当前检查内容未添加完整，请确认。");
 			return;
 		}
+		newmodel_no++;
 		add_content = TRUE;
 		planlist_ini(-2);
 	}
@@ -1767,7 +1777,128 @@ void CG_SUB_InspectionDlg::OnPlanmenu1addcontent()
 void CG_SUB_InspectionDlg::OnPlanmenu1export()
 {
 	// TODO: Add your command handler code here
-
+	CString wr_str;
+	CString filePath;
+	CString* data_;
+	CStdioFile m_file;
+	HTREEITEM sel_item[2];
+	int mode_ = -1;
+	int number = 1;
+	datepick.GetWindowText(temp_str);
+	if (!plan_tree.ItemHasChildren(hRoot))
+	{
+		SetTimer(0, 800, NULL);
+		info_edit.SetWindowText(L"无信息导出，请确认日期正确。");
+		return;
+	}
+	sel_item[0] = plan_tree.GetChildItem(hRoot);
+	if (inquery_pln)
+	{
+		mode_ = 0;
+		filePath = theApp.Desktopdir_ + L"\\" + temp_str + L"-planout.csv";
+	}
+	else if (inquery_dat)
+	{
+		mode_ = 1;
+		filePath = theApp.Desktopdir_ + L"\\" + temp_str + L"-errorout.csv";
+	}
+	else
+	{
+		return;
+	}
+	BOOL op_sign = m_file.Open((LPCTSTR)filePath, CFile::modeCreate | CFile::modeReadWrite | CFile::typeUnicode);//typeText
+	if (!op_sign)
+	{
+		SetTimer(0, 800, NULL);
+		info_edit.SetWindowText(L"目标文件无法打开。");
+		return;
+	}
+	m_file.SeekToEnd();
+	switch (mode_)
+	{
+	case 0://plan
+	{
+		data_ = new CString[5];
+		wr_str = _T("G-SUB03-Plan");
+		m_file.WriteString(wr_str);//(LPCTSTR)
+		m_file.WriteString(L"\n");
+		wr_str.Format(L"Date, %s ", temp_str);
+		m_file.WriteString((LPCTSTR)wr_str);
+		m_file.WriteString(L"\n");
+		wr_str = _T(" No. , Date , Model , Plan , OK , NG , State ");
+		m_file.WriteString((LPCTSTR)wr_str);
+		m_file.WriteString(L"\n");
+		while (NULL != sel_item[0])
+		{
+			data_[0] = plan_tree.GetItemText(sel_item[0]);//model
+			sel_item[1] = plan_tree.GetChildItem(sel_item[0]);
+			data_[1] = plan_tree.GetItemText(sel_item[1]);//plan
+			data_[1] = data_[1].Mid((data_[1].ReverseFind(':')) + 2);
+			sel_item[1] = plan_tree.GetNextSiblingItem(sel_item[1]);
+			data_[2] = plan_tree.GetItemText(sel_item[1]);//OK
+			data_[2] = data_[2].Mid((data_[2].ReverseFind(':')) + 2);
+			sel_item[1] = plan_tree.GetNextSiblingItem(sel_item[1]);
+			data_[3] = plan_tree.GetItemText(sel_item[1]);//NG
+			data_[3] = data_[3].Mid((data_[3].ReverseFind(':')) + 2);
+			sel_item[1] = plan_tree.GetNextSiblingItem(sel_item[1]);
+			data_[4] = plan_tree.GetItemText(sel_item[1]);//state
+			data_[4] = data_[4].Mid((data_[4].ReverseFind(':')) + 2);
+			if (data_[4] == L"已完成")
+			{
+				data_[4] = L"1";
+			}
+			else
+			{
+				data_[4] = L"0";
+			}
+			wr_str.Format(L" %d , %s , %s , %s , %s , %s , %s",
+				number, temp_str, data_[0], data_[1], data_[2], data_[3], data_[4]);
+			m_file.WriteString((LPCTSTR)wr_str);
+			m_file.WriteString(L"\n");
+			number++;
+			sel_item[0] = plan_tree.GetNextSiblingItem(sel_item[0]);		
+		}
+		delete[] data_;
+		break;
+	}
+	case 1://data
+	{
+		data_ = new CString[6];
+		wr_str = _T("G-SUB03-Plan");
+		m_file.WriteString(wr_str);//(LPCTSTR)
+		m_file.WriteString(L"\n");
+		wr_str.Format(L"Date, %s ", temp_str);
+		m_file.WriteString((LPCTSTR)wr_str);
+		m_file.WriteString(L"\n");
+		wr_str = _T(" No. , Date , Time , Model , Remarks , Error ");
+		m_file.WriteString((LPCTSTR)wr_str);
+		m_file.WriteString(L"\n");
+		_tsetlocale(LC_CTYPE, _T("jpn"));
+		while (NULL != sel_item[0])
+		{
+			data_[0] = plan_tree.GetItemText(sel_item[0]);
+			data_[1] = data_[0].Mid(0, data_[0].ReverseFind('-'));//time
+			data_[2] = data_[0].Mid((data_[0].ReverseFind('-')) + 1);//model
+			sel_item[1] = plan_tree.GetChildItem(sel_item[0]);
+			data_[3] = plan_tree.GetItemText(sel_item[1]);
+			data_[4] = data_[3].Mid(0, data_[3].ReverseFind('-'));//remarks
+			data_[5] = data_[3].Mid((data_[3].ReverseFind('-')) + 1);//error
+			wr_str.Format(L" %d , %s , %s , %s , %s , %s ",
+				number, temp_str, data_[1], data_[2], data_[4], data_[5]);
+			m_file.WriteString(wr_str);//(LPCTSTR)
+			m_file.WriteString(L"\n");
+			number++;
+			sel_item[0] = plan_tree.GetNextSiblingItem(sel_item[0]);
+		}
+		delete[] data_;
+		break;
+	}
+	default:
+		break;
+	}
+	
+	SetTimer(0, 800, NULL);
+	info_edit.SetWindowText(L"数据已导出至桌面，请确认。");
 }
 
 //Modify  Data in the Tree Ctrl
@@ -1964,7 +2095,6 @@ void CG_SUB_InspectionDlg::new_inspectcontent(HTREEITEM hRoot, int& newmodel_no)
 	plan_tree.SetItemData(subRoot4, 5);
 	plan_tree.Expand(hRoot, TVE_EXPAND);
 	plan_tree.Expand(new_item[newmodel_no], TVE_EXPAND);
-	newmodel_no++;
 }
 
 //Dynamiclly Create Edit Ctrl
@@ -2085,11 +2215,12 @@ int CG_SUB_InspectionDlg::camera_initialization()
 		}
 		else
 		{
-			if (MessageBox(L"USB相机连接异常，单击确认键等待程序退出后，检查相机电源及连接线是否松动，\
-并重启程序。", L"设备连接异常", MB_OK | MB_ICONERROR) == IDOK)
+			if (MessageBox(L"USB相机连接异常，单击确认键等待程序退出后，\
+检查相机电源及连接线是否松动，并重启程序。", L"设备连接异常", MB_OK | MB_ICONERROR) == IDOK)
 			{
 				SetTimer(-2, 600, NULL);
-				MessageBox(L"程序正在退出，请稍后...", L"设备连接异常", MB_OKCANCEL | MB_ICONWARNING);
+				MessageBox(L"程序正在退出，请稍后...", L"设备连接异常", 
+					MB_OKCANCEL | MB_ICONWARNING);
 				nReturn = -1;
 				return nReturn;
 			}
@@ -2100,11 +2231,12 @@ int CG_SUB_InspectionDlg::camera_initialization()
 	CTlFactory& TlFactory = CTlFactory::GetInstance();// Get the transport layer factory.
 	if (TlFactory.EnumerateDevices(devices_list) == 0)
 	{
-		if (MessageBox(L"Basler相机连接异常，单击确认键等待程序退出后，\
-检查相机电源是否松动，并重启程序。", L"设备连接异常", MB_OK | MB_ICONERROR) == IDOK)
+		if (MessageBox(L"Basler相机连接异常，单击确认键等待程序退出后，检查相机电源是否松动，\
+			并重启程序。", L"设备连接异常", MB_OK | MB_ICONERROR) == IDOK)
 		{
 			SetTimer(-2, 600, NULL);
-			MessageBox(L"程序正在退出，请稍后...", L"设备连接异常", MB_OKCANCEL | MB_ICONWARNING);
+			MessageBox(L"程序正在退出，请稍后...", L"设备连接异常",
+				MB_OKCANCEL | MB_ICONWARNING);
 			nReturn = -1;
 			return nReturn;
 		}
@@ -2133,11 +2265,14 @@ int CG_SUB_InspectionDlg::camera_initialization()
 		cam_basler.CenterX.SetValue(TRUE);
 		cam_basler.CenterY.SetValue(TRUE);
 		//
-		cam_basler.StartGrabbing(GrabStrategy_OneByOne, GrabLoop_ProvidedByInstantCamera);
+		cam_basler.StartGrabbing(GrabStrategy_OneByOne, 
+			GrabLoop_ProvidedByInstantCamera);
 		SetTimer(-2, 1200, NULL);
-		MessageBox(L"相机初始化中，请稍后...", L"提示信息", MB_ICONINFORMATION | MB_OK);
+		MessageBox(L"相机初始化中，请稍后...", L"提示信息", 
+			MB_ICONINFORMATION | MB_OK);
 	}
 	ini_parser.Clear();
+	cam_initializesign = TRUE;
 	return nReturn;
 }
 
@@ -2170,7 +2305,7 @@ void CG_SUB_InspectionDlg::AutoGainContinuous(Camera_basler& camera_basler)
 	camera_basler.AutoFunctionAOIOffsetY.SetValue(0);
 	camera_basler.AutoFunctionAOIWidth.SetValue(camera_basler.Width.GetMax());
 	camera_basler.AutoFunctionAOIHeight.SetValue(camera_basler.Height.GetMax());*/
-	if (IsAvailable(camera_basler.AutoFunctionROISelector))
+	/*if (IsAvailable(camera_basler.AutoFunctionROISelector))
 	{
 		// Set the Auto Function ROI for luminance statistics.
 		// We want to use ROI1 for gathering the statistics.
@@ -2188,13 +2323,13 @@ void CG_SUB_InspectionDlg::AutoGainContinuous(Camera_basler& camera_basler)
 		camera_basler.AutoFunctionROIOffsetY.SetValue(0);
 		camera_basler.AutoFunctionROIWidth.SetValue(camera_basler.Width.GetMax());
 		camera_basler.AutoFunctionROIHeight.SetValue(camera_basler.Height.GetMax());
-	}
+	}*/
 
 	// Set the target value for luminance control. The value is always expressed
 	// as an 8 bit value regardless of the current pixel data output format,
 	// i.e., 0 -> black, 255 -> white.
-	//camera_basler.AutoTargetValue.SetValue(80);
-	camera_basler.AutoTargetBrightness.SetValue(0.3);
+	camera_basler.AutoTargetValue.SetValue(80);
+	//camera_basler.AutoTargetBrightness.SetValue(0.3);
 	camera_basler.GainAuto.SetValue(GainAuto_Continuous);
 }
 
@@ -2222,12 +2357,12 @@ void CG_SUB_InspectionDlg::AutoExposureContinuous(Camera_basler& camera_basler)
 	// Currently, AutoFunctionAOISelector_AOI1 is predefined to gather
 	// luminance statistics.
 
-	/*camera_basler.AutoFunctionAOISelector.SetValue(AutoFunctionAOISelector_AOI1);
+	camera_basler.AutoFunctionAOISelector.SetValue(AutoFunctionAOISelector_AOI1);
 	camera_basler.AutoFunctionAOIOffsetX.SetValue(0);
 	camera_basler.AutoFunctionAOIOffsetY.SetValue(0);
 	camera_basler.AutoFunctionAOIWidth.SetValue(camera_basler.Width.GetMax());
-	camera_basler.AutoFunctionAOIHeight.SetValue(camera_basler.Height.GetMax());*/
-	if (IsAvailable(camera_basler.AutoFunctionROISelector))
+	camera_basler.AutoFunctionAOIHeight.SetValue(camera_basler.Height.GetMax());
+	/*if (IsAvailable(camera_basler.AutoFunctionROISelector))
 	{
 		// Set the Auto Function ROI for luminance statistics.
 		// We want to use ROI1 for gathering the statistics.
@@ -2245,13 +2380,13 @@ void CG_SUB_InspectionDlg::AutoExposureContinuous(Camera_basler& camera_basler)
 		camera_basler.AutoFunctionROIOffsetY.SetValue(0);
 		camera_basler.AutoFunctionROIWidth.SetValue(camera_basler.Width.GetMax());
 		camera_basler.AutoFunctionROIHeight.SetValue(camera_basler.Height.GetMax());
-	}
+	}*/
 
 	// Set the target value for luminance control. The value is always expressed
 	// as an 8 bit value regardless of the current pixel data output format,
 	// i.e., 0 -> black, 255 -> white.
-	//camera_basler.AutoTargetValue.SetValue(80);
-	camera_basler.AutoTargetBrightness.SetValue(0.3);
+	camera_basler.AutoTargetValue.SetValue(80);
+	//camera_basler.AutoTargetBrightness.SetValue(0.3);
 	camera_basler.ExposureAuto.SetValue(ExposureAuto_Continuous);
 }
 
@@ -2268,7 +2403,7 @@ void CG_SUB_InspectionDlg::OnImageGrabbed(CInstantCamera& camera_basler,
 		if (inspect_sgn)
 		{
 			BOOL general_sign = TRUE;
-			for (int m = 0; m < MAX_CAMERA; m++)
+			for (int m = 0; m < MAX_CAMERA; m++)//web camera
 			{
 				cam_data[m].cam_web >> cam_data[m].frame;
 				cam_data[m].cam_web >> cam_data[m].frame;
@@ -2276,19 +2411,21 @@ void CG_SUB_InspectionDlg::OnImageGrabbed(CInstantCamera& camera_basler,
 				for (int n = 0; n < inspect_data[m].number; n++)
 				{
 					double thres_ = inspect_data[m].threshold[n];
-					inspect_data[m].inspect_Result = Inspect_function(n, inspect_data[m].image_file[n], cam_data[m].frame,
-						inspect_data[m].ROI[n], thres_);
+					inspect_data[m].inspect_Result = Inspect_function(n, inspect_data[m].image_file[n], 
+						cam_data[m].frame,	inspect_data[m].ROI[n], thres_);
 					disp_image(IDC_inspec, cam_data[m].frame, gsub_ins, CRect(0, 0, 100, 100), m);
 					general_sign *= inspect_data[m].inspect_Result;
 				}
 			}
-			for (int p = 0; p < inspect_data[MAX_CAMERA].number; p++)
+			for (int p = 0; p < inspect_data[MAX_CAMERA].number; p++)//basler camera
 			{
 				camera_index = MAX_CAMERA;
 				double thres_ = inspect_data[MAX_CAMERA].threshold[p];
-				inspect_data[MAX_CAMERA].inspect_Result = Inspect_function(p, inspect_data[MAX_CAMERA].image_file[p], 
-					basler_frame, inspect_data[MAX_CAMERA].ROI[p], thres_);
-				disp_image(IDC_inspec, basler_frame, gsub_ins, CRect(0, 0, 100, 100), MAX_CAMERA);
+				inspect_data[MAX_CAMERA].inspect_Result = Inspect_function(p, 
+					inspect_data[MAX_CAMERA].image_file[p], basler_frame, 
+					inspect_data[MAX_CAMERA].ROI[p], thres_);
+				disp_image(IDC_inspec, basler_frame, gsub_ins, 
+					CRect(0, 0, 100, 100), MAX_CAMERA);
 				general_sign *= inspect_data[MAX_CAMERA].inspect_Result;
 			}
 			if (general_sign)
@@ -2318,7 +2455,8 @@ void CG_SUB_InspectionDlg::OnImageGrabbed(CInstantCamera& camera_basler,
 				{
 					current_model = plan_tree.GetItemText(selected_item);
 					temp_str.Format(L"机种变更: %s\r\n请注意确认。", current_model);
-					if (MessageBox(temp_str, L"机种变更确认", MB_OKCANCEL | MB_ICONQUESTION) == IDOK)
+					if (MessageBox(temp_str, L"机种变更确认", 
+						MB_OKCANCEL | MB_ICONQUESTION) == IDOK)
 					{
 						get_produceinfo(selected_item);
 						real_produce = 0;
@@ -2333,7 +2471,8 @@ void CG_SUB_InspectionDlg::OnImageGrabbed(CInstantCamera& camera_basler,
 				}
 				else
 				{
-					if (MessageBox(L"生产计划已完成。", L"提示信息", MB_OK | MB_ICONINFORMATION) == IDOK)
+					if (MessageBox(L"生产计划已完成。", L"提示信息", 
+						MB_OK | MB_ICONINFORMATION) == IDOK)
 					{
 						//stop inspecting
 						inspect_complete = TRUE;

@@ -61,8 +61,8 @@ using namespace std;
 using namespace cv;
 using namespace Pylon;
 using namespace GenApi;
-//using namespace Basler_GigECameraParams;
-using namespace Basler_UsbCameraParams;
+using namespace Basler_GigECameraParams;
+//using namespace Basler_UsbCameraParams;
 
 #define MAX_CAMERA 2
 
@@ -102,8 +102,8 @@ protected:
 	afx_msg HCURSOR OnQueryDragIcon();
 	DECLARE_MESSAGE_MAP()
 public:
-//	typedef CBaslerGigEInstantCamera Camera_basler;
-	typedef CBaslerUsbInstantCamera Camera_basler;
+	typedef CBaslerGigEInstantCamera Camera_basler;
+//	typedef CBaslerUsbInstantCamera Camera_basler;
 
 	struct camera_data
 	{
@@ -150,6 +150,7 @@ public:
 	char* temp_filename;
 
 	BOOL initialize_sgn = FALSE;
+	BOOL cam_initializesign = FALSE;
 	BOOL load_sgn = FALSE;
 	BOOL inquery_pswd = FALSE;
 	BOOL pswd_state = FALSE;
@@ -181,7 +182,7 @@ public:
 	vector<CString> strVecAccount;
 	vector<CString> modify_history;
 	
-	Mat paint_ = Mat(1024, 1280, CV_8UC3, Scalar::all(240));
+	Mat paint_ = Mat(1080, 1920, CV_8UC3, Scalar::all(240));
 	Mat basler_frame;
 	Mat target_image;
 
