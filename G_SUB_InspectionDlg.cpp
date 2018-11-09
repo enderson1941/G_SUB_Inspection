@@ -171,7 +171,6 @@ BOOL CG_SUB_InspectionDlg::OnInitDialog()
 		database_operation(-2, theApp.currentTime);
 	}
 	database_operation(-1, L"");
-
 	//
 	functionarea_init(-1);
 	m_hIcon = NULL;
@@ -181,10 +180,9 @@ BOOL CG_SUB_InspectionDlg::OnInitDialog()
 	func_btn.SetWindowText(L"开始\r\n检测");
 	instruction_output();
 	initialize_sgn = TRUE;
-
-	//camera initialization
-	//camera_initialization();
-
+	///camera initialization
+	camera_initialization();
+	//
 	COLORREF oldColor = RGB(240, 240, 240);
 	plan_tree.SetBkColor(oldColor);
 	plan_tree.SetImageList(&theApp.icontree_list, TVSIL_NORMAL);
@@ -195,13 +193,13 @@ BOOL CG_SUB_InspectionDlg::OnInitDialog()
 		model_sel.AddString(theApp.model_[i]);
 	}
 
+	modify_history.clear();
 	m_RectTracker.m_nStyle = CRectTracker::resizeOutside | CRectTracker::hatchedBorder;
 	m_RectTracker.m_nHandleSize = 6;
 	m_RectTracker.m_rect.SetRect(0, 0, 0, 0);
-
-	//repaint screen
+	//
+	///repaint screen
 	SetTimer(-1, 10, NULL);
-	modify_history.clear();
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
 
@@ -364,13 +362,12 @@ void CG_SUB_InspectionDlg::disp_image(UINT disp_ID, Mat dsp_img, CWnd* pt,
 {
 	double index_x = 1.0;
 	double index_y = 1.0;
-	IplImage cpy;
 	Mat tmp_img;
+	IplImage cpy;
 	CvvImage cimg;
 	CDC* _pDC;
 	HDC hDC;
 	CRect rect;
-	CRect rect_p;
 	_pDC = pt->GetDlgItem(disp_ID)->GetDC();
 	hDC = _pDC->GetSafeHdc();
 	pt->GetDlgItem(disp_ID)->GetClientRect(&rect);
@@ -378,13 +375,13 @@ void CG_SUB_InspectionDlg::disp_image(UINT disp_ID, Mat dsp_img, CWnd* pt,
 	if (load_sgn)
 	{
 		load_sgn = FALSE;
+		CRect rect_p;
 		rect_p = CRect(rect.TopLeft().x, rect.TopLeft().y, rect.BottomRight().x, rect.BottomRight().y);
 		Mat grey_img = Mat(rect.Width(), rect.Height(), CV_8UC3, Scalar::all(240));
 		cpy = grey_img;
 		cimg.CopyOf(&cpy);
 		cimg.DrawToHDC(hDC, &rect_p);
-	//	pt->ReleaseDC(_pDC);
-	//	return;
+		return;
 	}
 	switch (cam_index % 4)
 	{
@@ -1325,9 +1322,9 @@ void CG_SUB_InspectionDlg::OnClose()
 		{
 			cam_basler.StopGrabbing();
 		}
-		delete[] cam_data;
-		delete[] inspect_data;
 	}
+	delete[] cam_data;
+	delete[] inspect_data;
 	CDialogEx::OnCancel();
 }
 
@@ -1788,25 +1785,32 @@ void CG_SUB_InspectionDlg::OnPlanmenu1export()
 	if (!plan_tree.ItemHasChildren(hRoot))
 	{
 		SetTimer(0, 800, NULL);
-		info_edit.SetWindowText(L"无信息导出，请确认日期正确。");
+		info_edit.SetWindowText(L"无数据导出，请确认日期正确。");
 		return;
 	}
 	sel_item[0] = plan_tree.GetChildItem(hRoot);
 	if (inquery_pln)
 	{
 		mode_ = 0;
-		filePath = theApp.Desktopdir_ + L"\\" + temp_str + L"-planout.csv";
+		filePath = theApp.Desktopdir_ + L"\\" + temp_str + L"-生产计划导出.csv";
 	}
 	else if (inquery_dat)
 	{
 		mode_ = 1;
-		filePath = theApp.Desktopdir_ + L"\\" + temp_str + L"-errorout.csv";
+		filePath = theApp.Desktopdir_ + L"\\" + temp_str + L"-异常数据导出.csv";
 	}
 	else
 	{
 		return;
 	}
-	BOOL op_sign = m_file.Open((LPCTSTR)filePath, CFile::modeCreate | CFile::modeReadWrite | CFile::typeUnicode);//typeText
+	FILE* fp = NULL;
+	unsigned short int sUnicodeFlag;
+	sUnicodeFlag = 0xfeff;
+	fp = _wfopen(filePath, _T("wb"));
+	fwrite(&sUnicodeFlag, sizeof(short int), 1, fp);
+	fclose(fp);
+	//CFile::modeCreate | CFile::modeNoTruncate |
+	BOOL op_sign = m_file.Open((LPCTSTR)filePath, CFile::modeReadWrite | CFile::typeUnicode);
 	if (!op_sign)
 	{
 		SetTimer(0, 800, NULL);
@@ -1819,13 +1823,13 @@ void CG_SUB_InspectionDlg::OnPlanmenu1export()
 	case 0://plan
 	{
 		data_ = new CString[5];
-		wr_str = _T("G-SUB03-Plan");
+		wr_str = _T("G-SUB03 \t 生产计划导出");
 		m_file.WriteString(wr_str);//(LPCTSTR)
 		m_file.WriteString(L"\n");
-		wr_str.Format(L"Date, %s ", temp_str);
+		wr_str.Format(L"导出日期: \t %s ", theApp.currentTime);
 		m_file.WriteString((LPCTSTR)wr_str);
 		m_file.WriteString(L"\n");
-		wr_str = _T(" No. , Date , Model , Plan , OK , NG , State ");
+		wr_str = _T(" No. \t 生产日期 \t 机种名称 \t 计划生产 \t 实际生产 \t NG发生 \t 检查状态 ");
 		m_file.WriteString((LPCTSTR)wr_str);
 		m_file.WriteString(L"\n");
 		while (NULL != sel_item[0])
@@ -1843,15 +1847,7 @@ void CG_SUB_InspectionDlg::OnPlanmenu1export()
 			sel_item[1] = plan_tree.GetNextSiblingItem(sel_item[1]);
 			data_[4] = plan_tree.GetItemText(sel_item[1]);//state
 			data_[4] = data_[4].Mid((data_[4].ReverseFind(':')) + 2);
-			if (data_[4] == L"已完成")
-			{
-				data_[4] = L"1";
-			}
-			else
-			{
-				data_[4] = L"0";
-			}
-			wr_str.Format(L" %d , %s , %s , %s , %s , %s , %s",
+			wr_str.Format(L" %d \t %s \t %s \t %s \t %s \t %s \t %s",
 				number, temp_str, data_[0], data_[1], data_[2], data_[3], data_[4]);
 			m_file.WriteString((LPCTSTR)wr_str);
 			m_file.WriteString(L"\n");
@@ -1864,16 +1860,15 @@ void CG_SUB_InspectionDlg::OnPlanmenu1export()
 	case 1://data
 	{
 		data_ = new CString[6];
-		wr_str = _T("G-SUB03-Plan");
-		m_file.WriteString(wr_str);//(LPCTSTR)
+		wr_str = _T("G-SUB03 \t 异常数据导出");
+		m_file.WriteString(wr_str);
 		m_file.WriteString(L"\n");
-		wr_str.Format(L"Date, %s ", temp_str);
+		wr_str.Format(L"导出日期: \t %s ", theApp.currentTime);
 		m_file.WriteString((LPCTSTR)wr_str);
 		m_file.WriteString(L"\n");
-		wr_str = _T(" No. , Date , Time , Model , Remarks , Error ");
+		wr_str = _T(" No. \t 生产日期 \t 具体时间 \t 机种名称 \t 检查项目 \t 异常数据 ");
 		m_file.WriteString((LPCTSTR)wr_str);
 		m_file.WriteString(L"\n");
-		_tsetlocale(LC_CTYPE, _T("jpn"));
 		while (NULL != sel_item[0])
 		{
 			data_[0] = plan_tree.GetItemText(sel_item[0]);
@@ -1883,9 +1878,9 @@ void CG_SUB_InspectionDlg::OnPlanmenu1export()
 			data_[3] = plan_tree.GetItemText(sel_item[1]);
 			data_[4] = data_[3].Mid(0, data_[3].ReverseFind('-'));//remarks
 			data_[5] = data_[3].Mid((data_[3].ReverseFind('-')) + 1);//error
-			wr_str.Format(L" %d , %s , %s , %s , %s , %s ",
+			wr_str.Format(L" %d \t %s \t %s \t %s \t %s \t %s ",
 				number, temp_str, data_[1], data_[2], data_[4], data_[5]);
-			m_file.WriteString(wr_str);//(LPCTSTR)
+			m_file.WriteString(wr_str);
 			m_file.WriteString(L"\n");
 			number++;
 			sel_item[0] = plan_tree.GetNextSiblingItem(sel_item[0]);
@@ -1899,6 +1894,7 @@ void CG_SUB_InspectionDlg::OnPlanmenu1export()
 	
 	SetTimer(0, 800, NULL);
 	info_edit.SetWindowText(L"数据已导出至桌面，请确认。");
+	ShellExecute(NULL, _T("explore"), theApp.Desktopdir_, NULL, NULL, SW_SHOWNORMAL);
 }
 
 //Modify  Data in the Tree Ctrl
@@ -2215,12 +2211,31 @@ int CG_SUB_InspectionDlg::camera_initialization()
 		}
 		else
 		{
-			if (MessageBox(L"USB相机连接异常，单击确认键等待程序退出后，\
-检查相机电源及连接线是否松动，并重启程序。", L"设备连接异常", MB_OK | MB_ICONERROR) == IDOK)
+			int WAPI = MessageBox(L"USB相机连接异常，单击确认键等待程序退出后，\
+检查相机电源及连接线是否松动，并重启程序。", L"设备连接异常", MB_COMPOSITE | MB_ICONERROR);
+			if (WAPI == IDABORT)
 			{
 				SetTimer(-2, 600, NULL);
 				MessageBox(L"程序正在退出，请稍后...", L"设备连接异常", 
 					MB_OKCANCEL | MB_ICONWARNING);
+				nReturn = -1;
+				return nReturn;
+			}
+			else if (WAPI == IDRETRY)
+			{
+				OnClose();
+				//get exe path
+				TCHAR szAppName[MAX_PATH];
+				::GetModuleFileName(theApp.m_hInstance, szAppName, MAX_PATH);
+				CString strAppFullName;
+				strAppFullName.Format(_T("%s"), szAppName);
+				//restart	
+				STARTUPINFO StartInfo;
+				PROCESS_INFORMATION procStruct;
+				memset(&StartInfo, 0, sizeof(STARTUPINFO));
+				StartInfo.cb = sizeof(STARTUPINFO);
+				::CreateProcess((LPCTSTR)strAppFullName, NULL, NULL, NULL, FALSE,
+					NORMAL_PRIORITY_CLASS, NULL, NULL, &StartInfo, &procStruct);
 				nReturn = -1;
 				return nReturn;
 			}
@@ -2231,12 +2246,31 @@ int CG_SUB_InspectionDlg::camera_initialization()
 	CTlFactory& TlFactory = CTlFactory::GetInstance();// Get the transport layer factory.
 	if (TlFactory.EnumerateDevices(devices_list) == 0)
 	{
-		if (MessageBox(L"Basler相机连接异常，单击确认键等待程序退出后，检查相机电源是否松动，\
-			并重启程序。", L"设备连接异常", MB_OK | MB_ICONERROR) == IDOK)
+		int WAPI = MessageBox(L"Basler相机连接异常，单击确认键等待程序退出后，检查相机电源是否松动，\
+并重启程序。", L"设备连接异常", MB_COMPOSITE | MB_ICONERROR);
+		if (WAPI == IDABORT)
 		{
 			SetTimer(-2, 600, NULL);
 			MessageBox(L"程序正在退出，请稍后...", L"设备连接异常",
 				MB_OKCANCEL | MB_ICONWARNING);
+			nReturn = -1;
+			return nReturn;
+		}
+		else if (WAPI == IDRETRY)
+		{
+			OnClose();
+			//get exe path
+			TCHAR szAppName[MAX_PATH];
+			::GetModuleFileName(theApp.m_hInstance, szAppName, MAX_PATH);
+			CString strAppFullName;
+			strAppFullName.Format(_T("%s"), szAppName);
+			//restart	
+			STARTUPINFO StartInfo;
+			PROCESS_INFORMATION procStruct;
+			memset(&StartInfo, 0, sizeof(STARTUPINFO));
+			StartInfo.cb = sizeof(STARTUPINFO);
+			::CreateProcess((LPCTSTR)strAppFullName, NULL, NULL, NULL, FALSE,
+				NORMAL_PRIORITY_CLASS, NULL, NULL, &StartInfo, &procStruct);
 			nReturn = -1;
 			return nReturn;
 		}
@@ -2276,7 +2310,7 @@ int CG_SUB_InspectionDlg::camera_initialization()
 	return nReturn;
 }
 
-// void AutoGainContinuous
+//AutoGain
 void CG_SUB_InspectionDlg::AutoGainContinuous(Camera_basler& camera_basler)
 {
 	// Check whether the Gain Auto feature is available.
@@ -2333,7 +2367,7 @@ void CG_SUB_InspectionDlg::AutoGainContinuous(Camera_basler& camera_basler)
 	camera_basler.GainAuto.SetValue(GainAuto_Continuous);
 }
 
-// void AutoExposureContinuous
+//AutoExposure
 void CG_SUB_InspectionDlg::AutoExposureContinuous(Camera_basler& camera_basler)
 {
 	// Check whether the Exposure Auto feature is available.
@@ -2492,6 +2526,7 @@ void CG_SUB_InspectionDlg::OnImageGrabbed(CInstantCamera& camera_basler,
 #pragma endregion
 
 #pragma region Inspection
+//Template matching
 BOOL CG_SUB_InspectionDlg::Inspect_function(int index_, Mat template_img, 
 	Mat& inspect_img, Rect ROI, double& threshold)
 {
@@ -2605,7 +2640,7 @@ BOOL CG_SUB_InspectionDlg::Inspect_function(int index_, Mat template_img,
 	return check_sgn;
 }
 
-//record error message
+//Record error message
 void CG_SUB_InspectionDlg::record_errormessage(CString value1, CString value2,
 	CString file_path)
 {
