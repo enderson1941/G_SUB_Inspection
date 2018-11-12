@@ -156,7 +156,7 @@ BOOL CG_SUB_InspectionDlg::OnInitDialog()
 	// TODO: Add extra initialization here
 	gsub_ins = this;
 	CenterWindow();
-
+	//
 	USES_CONVERSION;
 	BOOL access_sign;
 	if (_access(theApp.database_file, 0) == -1)
@@ -174,12 +174,13 @@ BOOL CG_SUB_InspectionDlg::OnInitDialog()
 	//
 	functionarea_init(-1);
 	m_hIcon = NULL;
-	m_hIcon = (HICON)LoadImage(AfxGetApp()->m_hInstance, MAKEINTRESOURCE(IDI_ICON4),
-		IMAGE_ICON, 40, 40, LR_DEFAULTCOLOR);
+	m_hIcon = (HICON)LoadImage(AfxGetApp()->m_hInstance, 
+		MAKEINTRESOURCE(IDI_ICON4), IMAGE_ICON, 40, 40, LR_DEFAULTCOLOR);
 	func_btn.SetIcon(m_hIcon);
 	func_btn.SetWindowText(L"开始\r\n检测");
 	instruction_output();
 	initialize_sgn = TRUE;
+	//
 	///camera initialization
 	camera_initialization();
 	//
@@ -187,13 +188,13 @@ BOOL CG_SUB_InspectionDlg::OnInitDialog()
 	plan_tree.SetBkColor(oldColor);
 	plan_tree.SetImageList(&theApp.icontree_list, TVSIL_NORMAL);
 	plan_tree.ModifyStyle(TVS_DISABLEDRAGDROP, 0);
+	modify_history.clear();
 
 	for (int i = 0; i < theApp.model_.size(); i++)
 	{
 		model_sel.AddString(theApp.model_[i]);
 	}
 
-	modify_history.clear();
 	m_RectTracker.m_nStyle = CRectTracker::resizeOutside | CRectTracker::hatchedBorder;
 	m_RectTracker.m_nHandleSize = 6;
 	m_RectTracker.m_rect.SetRect(0, 0, 0, 0);
@@ -296,7 +297,7 @@ void CG_SUB_InspectionDlg::OnBnClickedfuncbutton()
 			cam_basler.TriggerMode.SetValue(TriggerMode_On);
 			cam_basler.TriggerActivation.SetValue(TriggerActivation_RisingEdge);
 			cam_basler.TriggerSelector.SetValue(TriggerSelector_FrameStart);
-		//	cam_basler.TriggerDelay.SetValue(635000);//635000
+		//	cam_basler.TriggerDelay.SetValue(635000);
 			cam_basler.TriggerDelayAbs.SetValue(635000);
 			cam_basler.AcquisitionMode.SetValue(AcquisitionMode_Continuous);
 			cam_basler.StartGrabbing(GrabStrategy_OneByOne, 
@@ -492,7 +493,7 @@ void CG_SUB_InspectionDlg::OnTimer(UINT_PTR nIDEvent)
 	}
 	case 1:
 	{
-		for (int i = 0; i < MAX_CAMERA; i++)//MAX_CAMERA
+		for (int i = 0; i < MAX_CAMERA; i++)
 		{
 			cam_data[i].cam_web >> cam_data[i].frame;
 		}
@@ -637,7 +638,7 @@ int CG_SUB_InspectionDlg::database_operation(int mode_, CString content)
 	}
 	case 0://confirm selected model
 	{
-		db_command.Format(L"select count(*)  from sqlite_master where type='table' and name = '%s' ", content);
+		db_command.Format(L"select count(*)  from sqlite_master where type = 'table' and name = '%s' ", content);
 		db_status = modify_db.Statement(db_command);
 		if (db_status != NULL)
 		{
@@ -717,7 +718,8 @@ int CG_SUB_InspectionDlg::database_operation(int mode_, CString content)
 	}
 	case 4:
 	{
-		db_command.Format(L"SELECT * FROM %s WHERE camera_index == %d", content, camera_index);
+		db_command.Format(L"SELECT * FROM %s WHERE camera_index == %d", content, 
+			camera_index);
 		db_status = modify_db.Statement(db_command);
 		USES_CONVERSION;
 		if (db_status != NULL)
@@ -992,7 +994,8 @@ void CG_SUB_InspectionDlg::OnKillfocusEdit()
 			if (index_ < MAX_CAMERA)
 			{
 				cam_data[index_].cam_web >> cam_data[index_].frame;
-				disp_image(IDC_inspec, cam_data[index_].frame, gsub_ins, CRect(0, 0, 100, 100), -1);
+				disp_image(IDC_inspec, cam_data[index_].frame, gsub_ins, 
+					CRect(0, 0, 100, 100), -1);
 				target_image = cam_data[index_].frame.clone();
 			}
 			else
@@ -1002,7 +1005,8 @@ void CG_SUB_InspectionDlg::OnKillfocusEdit()
 				cam_basler.TriggerMode.SetValue(TriggerMode_On);
 				Sleep(200);
 				cam_basler.AcquisitionMode.SetValue(AcquisitionMode_Continuous);
-				cam_basler.StartGrabbing(GrabStrategy_OneByOne, GrabLoop_ProvidedByInstantCamera);
+				cam_basler.StartGrabbing(GrabStrategy_OneByOne, 
+					GrabLoop_ProvidedByInstantCamera);
 				cam_basler.AcquisitionStart();
 				cam_basler.TriggerSource.SetValue(TriggerSource_Software);
 				cam_basler.TriggerSoftware.Execute();
@@ -1013,7 +1017,8 @@ void CG_SUB_InspectionDlg::OnKillfocusEdit()
 				cam_basler.StopGrabbing();
 				cam_basler.TriggerSource.SetValue(trigger_source);
 #pragma endregion
-				disp_image(IDC_inspec, basler_frame, gsub_ins, CRect(0, 0, 100, 100), -1);
+				disp_image(IDC_inspec, basler_frame, gsub_ins, 
+					CRect(0, 0, 100, 100), -1);
 				target_image = basler_frame.clone();
 			}
 			clip_sgn = TRUE;
@@ -1180,9 +1185,9 @@ void CG_SUB_InspectionDlg::OnRButtonDown(UINT nFlags, CPoint point)
 	{
 		if (cam_basler.IsPylonDeviceAttached())
 		{
-			/*cam_basler.SoftwareSignalSelector.SetValue(SoftwareSignalSelector_SoftwareSignal1);
-			cam_basler.SoftwareSignalPulse.Execute();
-			Sleep(200);*/
+			cam_basler.TriggerSource.SetValue(TriggerSource_Software);
+			cam_basler.TriggerSoftware.Execute();
+			Sleep(200);
 		}
 	}
 	CDialogEx::OnRButtonDown(nFlags, point);
@@ -1803,12 +1808,7 @@ void CG_SUB_InspectionDlg::OnPlanmenu1export()
 	{
 		return;
 	}
-	FILE* fp = NULL;
-	unsigned short int sUnicodeFlag;
-	sUnicodeFlag = 0xfeff;
-	fp = _wfopen(filePath, _T("wb"));
-	fwrite(&sUnicodeFlag, sizeof(short int), 1, fp);
-	fclose(fp);
+	spl_wnd->wr_unicodefile(filePath);
 	//CFile::modeCreate | CFile::modeNoTruncate |
 	BOOL op_sign = m_file.Open((LPCTSTR)filePath, CFile::modeReadWrite | CFile::typeUnicode);
 	if (!op_sign)
@@ -2211,8 +2211,9 @@ int CG_SUB_InspectionDlg::camera_initialization()
 		}
 		else
 		{
-			int WAPI = MessageBox(L"USB相机连接异常，单击确认键等待程序退出后，\
-检查相机电源及连接线是否松动，并重启程序。", L"设备连接异常", MB_COMPOSITE | MB_ICONERROR);
+			temp_str.Format(L"USB相机%d连接异常，单击确认键等待程序退出后，\
+检查相机电源及连接线是否松动，并重启程序。", i + 1);
+			int WAPI = MessageBox(temp_str, L"设备连接异常", MB_COMPOSITE | MB_ICONERROR);
 			if (WAPI == IDABORT)
 			{
 				SetTimer(-2, 600, NULL);
@@ -2334,34 +2335,34 @@ void CG_SUB_InspectionDlg::AutoGainContinuous(Camera_basler& camera_basler)
 	// Currently, AutoFunctionAOISelector_AOI1 is predefined to gather
 	// luminance statistics.
 
-	/*camera_basler.AutoFunctionAOISelector.SetValue(AutoFunctionAOISelector_AOI1);
+	camera_basler.AutoFunctionAOISelector.SetValue(AutoFunctionAOISelector_AOI1);
 	camera_basler.AutoFunctionAOIOffsetX.SetValue(0);
 	camera_basler.AutoFunctionAOIOffsetY.SetValue(0);
 	camera_basler.AutoFunctionAOIWidth.SetValue(camera_basler.Width.GetMax());
-	camera_basler.AutoFunctionAOIHeight.SetValue(camera_basler.Height.GetMax());*/
-	/*if (IsAvailable(camera_basler.AutoFunctionROISelector))
-	{
-		// Set the Auto Function ROI for luminance statistics.
-		// We want to use ROI1 for gathering the statistics.
-		if (IsWritable(camera_basler.AutoFunctionROIUseBrightness))
-		{
-			camera_basler.AutoFunctionROISelector.SetValue(AutoFunctionROISelector_ROI1);
-			camera_basler.AutoFunctionROIUseBrightness.SetValue(true);   // ROI 1 is used for brightness control
-			camera_basler.AutoFunctionROISelector.SetValue(AutoFunctionROISelector_ROI2);
-			camera_basler.AutoFunctionROIUseBrightness.SetValue(false);   // ROI 2 is not used for brightness control
-		}
-
-		// Set the ROI (in this example the complete sensor is used)
-		camera_basler.AutoFunctionROISelector.SetValue(AutoFunctionROISelector_ROI1);  // configure ROI 1
-		camera_basler.AutoFunctionROIOffsetX.SetValue(0);
-		camera_basler.AutoFunctionROIOffsetY.SetValue(0);
-		camera_basler.AutoFunctionROIWidth.SetValue(camera_basler.Width.GetMax());
-		camera_basler.AutoFunctionROIHeight.SetValue(camera_basler.Height.GetMax());
-	}*/
+	camera_basler.AutoFunctionAOIHeight.SetValue(camera_basler.Height.GetMax());
+	//if (IsAvailable(camera_basler.AutoFunctionROISelector))
+	//{
+	//	// Set the Auto Function ROI for luminance statistics.
+	//	// We want to use ROI1 for gathering the statistics.
+	//	if (IsWritable(camera_basler.AutoFunctionROIUseBrightness))
+	//	{
+	//		camera_basler.AutoFunctionROISelector.SetValue(AutoFunctionROISelector_ROI1);
+	//		camera_basler.AutoFunctionROIUseBrightness.SetValue(true);   // ROI 1 is used for brightness control
+	//		camera_basler.AutoFunctionROISelector.SetValue(AutoFunctionROISelector_ROI2);
+	//		camera_basler.AutoFunctionROIUseBrightness.SetValue(false);   // ROI 2 is not used for brightness control
+	//	}
+	//	// Set the ROI (in this example the complete sensor is used)
+	//	camera_basler.AutoFunctionROISelector.SetValue(AutoFunctionROISelector_ROI1);  // configure ROI 1
+	//	camera_basler.AutoFunctionROIOffsetX.SetValue(0);
+	//	camera_basler.AutoFunctionROIOffsetY.SetValue(0);
+	//	camera_basler.AutoFunctionROIWidth.SetValue(camera_basler.Width.GetMax());
+	//	camera_basler.AutoFunctionROIHeight.SetValue(camera_basler.Height.GetMax());
+	//}
 
 	// Set the target value for luminance control. The value is always expressed
 	// as an 8 bit value regardless of the current pixel data output format,
 	// i.e., 0 -> black, 255 -> white.
+
 	camera_basler.AutoTargetValue.SetValue(80);
 	//camera_basler.AutoTargetBrightness.SetValue(0.3);
 	camera_basler.GainAuto.SetValue(GainAuto_Continuous);
@@ -2396,25 +2397,24 @@ void CG_SUB_InspectionDlg::AutoExposureContinuous(Camera_basler& camera_basler)
 	camera_basler.AutoFunctionAOIOffsetY.SetValue(0);
 	camera_basler.AutoFunctionAOIWidth.SetValue(camera_basler.Width.GetMax());
 	camera_basler.AutoFunctionAOIHeight.SetValue(camera_basler.Height.GetMax());
-	/*if (IsAvailable(camera_basler.AutoFunctionROISelector))
-	{
-		// Set the Auto Function ROI for luminance statistics.
-		// We want to use ROI1 for gathering the statistics.
-		if (IsWritable(camera_basler.AutoFunctionROIUseBrightness))
-		{
-			camera_basler.AutoFunctionROISelector.SetValue(AutoFunctionROISelector_ROI1);
-			camera_basler.AutoFunctionROIUseBrightness.SetValue(true);   // ROI 1 is used for brightness control
-			camera_basler.AutoFunctionROISelector.SetValue(AutoFunctionROISelector_ROI2);
-			camera_basler.AutoFunctionROIUseBrightness.SetValue(false);   // ROI 2 is not used for brightness control
-		}
-
-		// Set the ROI (in this example the complete sensor is used)
-		camera_basler.AutoFunctionROISelector.SetValue(AutoFunctionROISelector_ROI1);  // configure ROI 1
-		camera_basler.AutoFunctionROIOffsetX.SetValue(0);
-		camera_basler.AutoFunctionROIOffsetY.SetValue(0);
-		camera_basler.AutoFunctionROIWidth.SetValue(camera_basler.Width.GetMax());
-		camera_basler.AutoFunctionROIHeight.SetValue(camera_basler.Height.GetMax());
-	}*/
+	//if (IsAvailable(camera_basler.AutoFunctionROISelector))
+	//{
+	//	// Set the Auto Function ROI for luminance statistics.
+	//	// We want to use ROI1 for gathering the statistics.
+	//	if (IsWritable(camera_basler.AutoFunctionROIUseBrightness))
+	//	{
+	//		camera_basler.AutoFunctionROISelector.SetValue(AutoFunctionROISelector_ROI1);
+	//		camera_basler.AutoFunctionROIUseBrightness.SetValue(true);   // ROI 1 is used for brightness control
+	//		camera_basler.AutoFunctionROISelector.SetValue(AutoFunctionROISelector_ROI2);
+	//		camera_basler.AutoFunctionROIUseBrightness.SetValue(false);   // ROI 2 is not used for brightness control
+	//	}
+	//	// Set the ROI (in this example the complete sensor is used)
+	//	camera_basler.AutoFunctionROISelector.SetValue(AutoFunctionROISelector_ROI1);  // configure ROI 1
+	//	camera_basler.AutoFunctionROIOffsetX.SetValue(0);
+	//	camera_basler.AutoFunctionROIOffsetY.SetValue(0);
+	//	camera_basler.AutoFunctionROIWidth.SetValue(camera_basler.Width.GetMax());
+	//	camera_basler.AutoFunctionROIHeight.SetValue(camera_basler.Height.GetMax());
+	//}
 
 	// Set the target value for luminance control. The value is always expressed
 	// as an 8 bit value regardless of the current pixel data output format,
@@ -2575,6 +2575,11 @@ BOOL CG_SUB_InspectionDlg::Inspect_function(int index_, Mat template_img,
 
 		res_cols = gray_image.cols - temp_image.cols + 1;
 		res_rows = gray_image.rows - temp_image.rows + 1;
+		if (res_cols < 0 || res_rows < 0)
+		{
+			check_sgn = FALSE;
+			break;
+		}
 		res_image = Mat(res_cols, res_rows, CV_32FC1);
 
 		matchTemplate(gray_image, temp_image, res_image, CV_TM_CCOEFF_NORMED);
@@ -2586,7 +2591,6 @@ BOOL CG_SUB_InspectionDlg::Inspect_function(int index_, Mat template_img,
 			threshold = maxVal;
 			maxLoc = temp_Loc;
 			check_sgn = TRUE;
-			break;
 		}
 		else
 		{
@@ -2604,7 +2608,7 @@ BOOL CG_SUB_InspectionDlg::Inspect_function(int index_, Mat template_img,
 		err_text.Format(L"err: %.2f", err_value);
 		char* err_msg = T2A(err_text.GetBuffer(0));
 		err_text.ReleaseBuffer();
-		putText(ori_image, err_msg, ROI.br(), cv::HersheyFonts::FONT_HERSHEY_COMPLEX, 2.5, Scalar(0, 0, 255), 2);
+		putText(ori_image, err_msg, ROI.br(), FONT_HERSHEY_COMPLEX, 2.5, Scalar(0, 0, 255), 2);
 		if (!PathIsDirectory(error_imagefile + current_date))
 		{
 			::CreateDirectory(error_imagefile + current_date, NULL);
