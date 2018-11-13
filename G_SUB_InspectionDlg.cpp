@@ -1062,16 +1062,19 @@ void CG_SUB_InspectionDlg::OnLButtonDown(UINT nFlags, CPoint point)
 	// TODO: Add your message handler code here and/or call default
 	CPoint cur_pos;
 	CPoint start_point;
-	start_point = point;
+	CPoint clip_point;
 	CRect cwrect;
 	CRect clip_rect;
+	start_point = point;
 	clip_rect = disp_rect;
 	clip_rect.TopLeft().x += 23;
 	clip_rect.TopLeft().y += 40;
 	clip_rect.BottomRight().x += 23;
 	clip_rect.BottomRight().y += 40;
-	start_point.x -= clip_rect.TopLeft().x;
-	start_point.y -= clip_rect.TopLeft().y;
+	clip_point.x = clip_rect.TopLeft().x;
+	clip_point.y = clip_rect.TopLeft().y;
+	start_point.x -= clip_point.x;
+	start_point.y -= clip_point.y;
 
 	GetCursorPos(&cur_pos);
 	ClientToScreen(clip_rect);
@@ -1085,6 +1088,9 @@ void CG_SUB_InspectionDlg::OnLButtonDown(UINT nFlags, CPoint point)
 		else
 		{
 			m_RectTracker.Track(this, point, TRUE);
+			start_point = m_RectTracker.m_rect.TopLeft();
+			start_point.x -= clip_point.x;
+			start_point.y -= clip_point.y;
 		}
 		m_RectTracker.m_rect.NormalizeRect();
 		cut_rect.x = start_point.x * scale_index;

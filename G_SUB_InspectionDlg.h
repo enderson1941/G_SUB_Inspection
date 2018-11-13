@@ -64,7 +64,7 @@ using namespace GenApi;
 using namespace Basler_GigECameraParams;
 //using namespace Basler_UsbCameraParams;
 
-#define MAX_CAMERA 1
+#define MAX_CAMERA 2
 
 // CG_SUB_InspectionDlg dialog
 class CG_SUB_InspectionDlg : public CDialogEx, public CImageEventHandler
