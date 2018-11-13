@@ -7,7 +7,7 @@
 *.VC
 *.vc.vc.opendb
 *.jpg
-
+*.tlog
 
 # Compiled Object files
 
