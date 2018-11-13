@@ -106,11 +106,11 @@ BOOL SplashWnd::OnInitDialog()
 		WritePrivateProfileString(L"INFO", L"软件功能", _str, appPathFile);
 		_str.Format(version_);
 		WritePrivateProfileString(L"INFO", L"当前版本", _str, appPathFile);
-		_str.Format(L"KISYU 2# G_SUB03");
+		_str.Format(L"KISYU 2# G-SUB-03");
 		WritePrivateProfileString(L"INFO", L"工程名称", _str, appPathFile);
 		_str.Format(L"大和设备开发部");
 		WritePrivateProfileString(L"INFO", L"联系部门", _str, appPathFile);
-		_str.Format(L"881");
+		_str.Format(L"881(大和)");
 		WritePrivateProfileString(L"INFO", L"内线电话", _str, appPathFile);
 	}
 	//

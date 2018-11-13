@@ -64,7 +64,7 @@ using namespace GenApi;
 using namespace Basler_GigECameraParams;
 //using namespace Basler_UsbCameraParams;
 
-#define MAX_CAMERA 2
+#define MAX_CAMERA 1
 
 // CG_SUB_InspectionDlg dialog
 class CG_SUB_InspectionDlg : public CDialogEx, public CImageEventHandler
@@ -181,6 +181,7 @@ public:
 	CImageList* m_pImageList;
 	vector<CString> strVecAccount;
 	vector<CString> modify_history;
+	vector<CString> m_FileList;
 	
 	Mat paint_ = Mat(1080, 1920, CV_8UC3, Scalar::all(240));
 	Mat basler_frame;

@@ -271,6 +271,13 @@ void CG_SUB_InspectionDlg::OnBnClickedfuncbutton()
 	mdy_md = FALSE;
 	m_Info.DestroyWindow();
 	functionarea_init(0);
+	if (!cam_initializesign)
+	{
+		planlist_ini(0);
+		SetTimer(0, 900, NULL);
+		info_edit.SetWindowText(L"相机未初始化成功，不能进行检测。");
+		return;
+	}
 #pragma endregion
 	if (!inspect_sgn)
 	{
@@ -1466,6 +1473,25 @@ int CG_SUB_InspectionDlg::planlist_ini(int mode_)
 		else
 		{
 			queryTreeNode(plan_tree, hRoot, temp_str);
+			//
+			CString csDirPath;
+			datepick.GetWindowText(csDirPath);
+			csDirPath = error_imagefile + csDirPath;
+			csDirPath += L"\\*.bmp";
+			HANDLE file;
+			WIN32_FIND_DATA fileData;
+			char line[1024];
+			char fn[1000];
+			file = FindFirstFile(csDirPath.GetBuffer(), &fileData);
+			m_FileList.push_back(fileData.cFileName);
+			bool bState = false;
+			bState = FindNextFile(file, &fileData);
+			while (bState)
+			{
+				m_FileList.push_back(fileData.cFileName);
+				bState = FindNextFile(file, &fileData);
+			}
+			m_FileList.shrink_to_fit();
 		}
 		break;
 	}
@@ -1507,6 +1533,31 @@ void CG_SUB_InspectionDlg::OnTvnSelchangedplan(NMHDR *pNMHDR, LRESULT *pResult)
 {
 	LPNMTREEVIEW pNMTreeView = reinterpret_cast<LPNMTREEVIEW>(pNMHDR);
 	// TODO: Add your control notification handler code here
+	if (inquery_dat)
+	{
+		int index = -1;
+		CString selected_date;
+		datepick.GetWindowText(selected_date);
+		selected_item = plan_tree.GetSelectedItem();
+		CString selected_text = plan_tree.GetItemText(selected_item);//part
+		for (int i = 0; i < m_FileList.size(); i++)
+		{
+			index = m_FileList[i].Find(selected_text, 0);
+			if (index != -1)
+			{
+				USES_CONVERSION;
+				temp_str = error_imagefile + selected_date + L"\\" + m_FileList[i];
+				temp_filename = T2A(temp_str.GetBuffer(0));
+				temp_str.ReleaseBuffer();
+				Mat error_image = imread(temp_filename);
+				if (error_image.data)
+				{
+					disp_image(IDC_inspec, error_image, gsub_ins, CRect(0, 0, 100, 100), -1);
+				}
+				break;
+			}
+		}
+	}
 	*pResult = 0;
 }
 
@@ -1866,7 +1917,7 @@ void CG_SUB_InspectionDlg::OnPlanmenu1export()
 		wr_str.Format(L"导出日期: \t %s ", theApp.currentTime);
 		m_file.WriteString((LPCTSTR)wr_str);
 		m_file.WriteString(L"\n");
-		wr_str = _T(" No. \t 生产日期 \t 具体时间 \t 机种名称 \t 检查项目 \t 异常数据 ");
+		wr_str = _T(" No. \t 生产日期 \t 具体时间 \t 机种名称 \t 检查项目 \t 异常状况 ");
 		m_file.WriteString((LPCTSTR)wr_str);
 		m_file.WriteString(L"\n");
 		while (NULL != sel_item[0])
@@ -2188,6 +2239,7 @@ BOOL CG_SUB_InspectionDlg::get_produceinfo(HTREEITEM model)
 int CG_SUB_InspectionDlg::camera_initialization()
 {
 	int nReturn = 0;
+	cam_initializesign = FALSE;
 	/*WEB Camera*/
 	cam_data = new camera_data[MAX_CAMERA];
 	inspect_data = new inspectcontents_data[MAX_CAMERA + 1];
@@ -2219,8 +2271,6 @@ int CG_SUB_InspectionDlg::camera_initialization()
 				SetTimer(-2, 600, NULL);
 				MessageBox(L"程序正在退出，请稍后...", L"设备连接异常", 
 					MB_OKCANCEL | MB_ICONWARNING);
-				nReturn = -1;
-				return nReturn;
 			}
 			else if (WAPI == IDRETRY)
 			{
@@ -2237,12 +2287,13 @@ int CG_SUB_InspectionDlg::camera_initialization()
 				StartInfo.cb = sizeof(STARTUPINFO);
 				::CreateProcess((LPCTSTR)strAppFullName, NULL, NULL, NULL, FALSE,
 					NORMAL_PRIORITY_CLASS, NULL, NULL, &StartInfo, &procStruct);
-				nReturn = -1;
-				return nReturn;
 			}
+			cam_initializesign = FALSE;
+			ini_parser.Clear();
+			nReturn = -1;
+			return nReturn;
 		}
 	}
-	SetTimer(1, 100, NULL);
 	/*Basler Camera*/
 	CTlFactory& TlFactory = CTlFactory::GetInstance();// Get the transport layer factory.
 	if (TlFactory.EnumerateDevices(devices_list) == 0)
@@ -2254,8 +2305,6 @@ int CG_SUB_InspectionDlg::camera_initialization()
 			SetTimer(-2, 600, NULL);
 			MessageBox(L"程序正在退出，请稍后...", L"设备连接异常",
 				MB_OKCANCEL | MB_ICONWARNING);
-			nReturn = -1;
-			return nReturn;
 		}
 		else if (WAPI == IDRETRY)
 		{
@@ -2272,9 +2321,11 @@ int CG_SUB_InspectionDlg::camera_initialization()
 			StartInfo.cb = sizeof(STARTUPINFO);
 			::CreateProcess((LPCTSTR)strAppFullName, NULL, NULL, NULL, FALSE,
 				NORMAL_PRIORITY_CLASS, NULL, NULL, &StartInfo, &procStruct);
-			nReturn = -1;
-			return nReturn;
 		}
+		cam_initializesign = FALSE;
+		ini_parser.Clear();
+		nReturn = -1;
+		return nReturn;
 	}
 	else
 	{
@@ -2306,6 +2357,7 @@ int CG_SUB_InspectionDlg::camera_initialization()
 		MessageBox(L"相机初始化中，请稍后...", L"提示信息", 
 			MB_ICONINFORMATION | MB_OK);
 	}
+	SetTimer(1, 100, NULL);
 	ini_parser.Clear();
 	cam_initializesign = TRUE;
 	return nReturn;
