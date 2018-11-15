@@ -299,13 +299,12 @@ void CG_SUB_InspectionDlg::OnBnClickedfuncbutton()
 		{
 			SetTimer(0, 100, NULL);
 #pragma region Basler
+			KillTimer(1);
 			cam_basler.StopGrabbing();
 			Sleep(200);
 			cam_basler.TriggerMode.SetValue(TriggerMode_On);
 			cam_basler.TriggerActivation.SetValue(TriggerActivation_RisingEdge);
 			cam_basler.TriggerSelector.SetValue(TriggerSelector_FrameStart);
-		//	cam_basler.TriggerDelay.SetValue(635000);
-			cam_basler.TriggerDelayAbs.SetValue(635000);
 			cam_basler.AcquisitionMode.SetValue(AcquisitionMode_Continuous);
 			cam_basler.StartGrabbing(GrabStrategy_OneByOne, 
 				GrabLoop_ProvidedByInstantCamera);
@@ -744,7 +743,7 @@ int CG_SUB_InspectionDlg::database_operation(int mode_, CString content)
 				Mat temp_image = imread(file_name);
 				inspect_data[camera_index].image_file.push_back(temp_image);
 				temp_int = temp_str.ReverseFind('\\');
-				temp_str = temp_str.Mid(temp_int + 1, temp_int - 3);
+				temp_str = temp_str.Mid(temp_int + 1, temp_int - 2);
 				inspect_data[camera_index].contents_names.push_back(temp_str);
 				//ROI
 				temp_int = 0;
@@ -842,8 +841,6 @@ void CG_SUB_InspectionDlg::OnDtnDatetimechangedatepick(NMHDR *pNMHDR, LRESULT *p
 	LPNMDATETIMECHANGE pDTChange = reinterpret_cast<LPNMDATETIMECHANGE>(pNMHDR);
 	// TODO: Add your control notification handler code here
 	*pResult = 0;
-	CTime m_date;
-	datepick.GetTime(m_date);
 	if (inquery_dat)
 	{
 		planlist_ini(3);
@@ -1167,22 +1164,22 @@ void CG_SUB_InspectionDlg::OnRButtonDown(UINT nFlags, CPoint point)
 		}
 		CString roi_;
 		int* set_roi = new int[4];
-		set_roi[0] = cut_rect.tl().x - 40;
+		set_roi[0] = cut_rect.tl().x - 80;
 		if (set_roi[0] < 0)
 		{
 			set_roi[0] = 5;
 		}
-		set_roi[1] = cut_rect.tl().y - 40;
+		set_roi[1] = cut_rect.tl().y - 80;
 		if (set_roi[1] < 0)
 		{
 			set_roi[1] = 5;
 		}
-		set_roi[2] = cut_rect.width + 80;
+		set_roi[2] = cut_rect.width + 160;
 		if (set_roi[0] + set_roi[2] > 1905)
 		{
 			set_roi[2] = 1905 - set_roi[0];
 		}
-		set_roi[3] = cut_rect.height + 80;
+		set_roi[3] = cut_rect.height + 160;
 		if (set_roi[1] + set_roi[3] > 1060)
 		{
 			set_roi[3] = 1060 - set_roi[1];
@@ -1198,9 +1195,9 @@ void CG_SUB_InspectionDlg::OnRButtonDown(UINT nFlags, CPoint point)
 	{
 		if (cam_basler.IsPylonDeviceAttached())
 		{
-			cam_basler.TriggerSource.SetValue(TriggerSource_Software);
+			/*cam_basler.TriggerSource.SetValue(TriggerSource_Software);
 			cam_basler.TriggerSoftware.Execute();
-			Sleep(200);
+			Sleep(300);*/
 		}
 	}
 	CDialogEx::OnRButtonDown(nFlags, point);
@@ -2269,8 +2266,8 @@ int CG_SUB_InspectionDlg::camera_initialization()
 		}
 		else
 		{
-			temp_str.Format(L"USB相机%d连接异常，单击确认键等待程序退出后，\
-检查相机电源及连接线是否松动，并重启程序。", i + 1);
+			temp_str.Format(L"USB相机%d连接异常，单击程序中止，\
+或检查相机电源及连接线是否松动，单击重试。", i + 1);
 			int WAPI = MessageBox(temp_str, L"设备连接异常", MB_COMPOSITE | MB_ICONERROR);
 			if (WAPI == IDABORT)
 			{
@@ -2304,8 +2301,8 @@ int CG_SUB_InspectionDlg::camera_initialization()
 	CTlFactory& TlFactory = CTlFactory::GetInstance();// Get the transport layer factory.
 	if (TlFactory.EnumerateDevices(devices_list) == 0)
 	{
-		int WAPI = MessageBox(L"Basler相机连接异常，单击确认键等待程序退出后，检查相机电源是否松动，\
-并重启程序。", L"设备连接异常", MB_COMPOSITE | MB_ICONERROR);
+		int WAPI = MessageBox(L"Basler相机连接异常，单击程序中止，或检查相机电源是否松动后，\
+单击重试。", L"设备连接异常", MB_COMPOSITE | MB_ICONERROR);
 		if (WAPI == IDABORT)
 		{
 			SetTimer(-2, 600, NULL);
@@ -2343,7 +2340,7 @@ int CG_SUB_InspectionDlg::camera_initialization()
 			Ownership_ExternalOwnership);
 		cam_basler.Open();
 		cam_basler.AcquisitionMode.SetValue(AcquisitionMode_Continuous);
-		// Carry out luminance control by using the "continuous" gain auto function.
+		// Carry out gain control by using the "continuous" gain auto function.
 		AutoGainContinuous(cam_basler);
 		// Carry out luminance control by using the "continuous" exposure auto function.
 		AutoExposureContinuous(cam_basler);
@@ -2351,6 +2348,11 @@ int CG_SUB_InspectionDlg::camera_initialization()
 		trigger_source = (TriggerSourceEnums)_ttoi(temp_str);
 		cam_basler.TriggerSource.SetValue(trigger_source);
 		cam_basler.TriggerMode.SetValue(TriggerMode_Off);
+		temp_str = ini_parser.GetValue("Basler Camera", L"Gamma", size_);
+		cam_basler.Gamma.SetValue(_ttof(temp_str));
+		temp_str = ini_parser.GetValue("Basler Camera", L"trigger_delay", size_);
+		//cam_basler.TriggerDelay.SetValue(_ttof(temp_str));
+		cam_basler.TriggerDelayAbs.SetValue(_ttof(temp_str));
 		converter.OutputPixelFormat = PixelType_Mono8;
 		cam_basler.Width.SetValue(frame_width);
 		cam_basler.Height.SetValue(frame_height);
@@ -2398,6 +2400,7 @@ void CG_SUB_InspectionDlg::AutoGainContinuous(Camera_basler& camera_basler)
 	camera_basler.AutoFunctionAOIOffsetY.SetValue(0);
 	camera_basler.AutoFunctionAOIWidth.SetValue(camera_basler.Width.GetMax());
 	camera_basler.AutoFunctionAOIHeight.SetValue(camera_basler.Height.GetMax());
+
 	//if (IsAvailable(camera_basler.AutoFunctionROISelector))
 	//{
 	//	// Set the Auto Function ROI for luminance statistics.
@@ -2421,8 +2424,8 @@ void CG_SUB_InspectionDlg::AutoGainContinuous(Camera_basler& camera_basler)
 	// as an 8 bit value regardless of the current pixel data output format,
 	// i.e., 0 -> black, 255 -> white.
 
-	camera_basler.AutoTargetValue.SetValue(80);
-	//camera_basler.AutoTargetBrightness.SetValue(0.3);
+	camera_basler.AutoTargetValue.SetValue(80);//Gige
+	//camera_basler.AutoTargetBrightness.SetValue(0.3);//USB
 	camera_basler.GainAuto.SetValue(GainAuto_Continuous);
 }
 
@@ -2455,6 +2458,7 @@ void CG_SUB_InspectionDlg::AutoExposureContinuous(Camera_basler& camera_basler)
 	camera_basler.AutoFunctionAOIOffsetY.SetValue(0);
 	camera_basler.AutoFunctionAOIWidth.SetValue(camera_basler.Width.GetMax());
 	camera_basler.AutoFunctionAOIHeight.SetValue(camera_basler.Height.GetMax());
+
 	//if (IsAvailable(camera_basler.AutoFunctionROISelector))
 	//{
 	//	// Set the Auto Function ROI for luminance statistics.
@@ -2477,8 +2481,8 @@ void CG_SUB_InspectionDlg::AutoExposureContinuous(Camera_basler& camera_basler)
 	// Set the target value for luminance control. The value is always expressed
 	// as an 8 bit value regardless of the current pixel data output format,
 	// i.e., 0 -> black, 255 -> white.
-	camera_basler.AutoTargetValue.SetValue(80);
-	//camera_basler.AutoTargetBrightness.SetValue(0.3);
+	camera_basler.AutoTargetValue.SetValue(80);//Gige
+	//camera_basler.AutoTargetBrightness.SetValue(0.3);//USB
 	camera_basler.ExposureAuto.SetValue(ExposureAuto_Continuous);
 }
 
@@ -2487,6 +2491,7 @@ void CG_SUB_InspectionDlg::OnImageGrabbed(CInstantCamera& camera_basler,
 {
 	if (ptrGrabResult_basler->GrabSucceeded())
 	{
+		Sleep(100);
 		converter.Convert(targetImage, ptrGrabResult_basler);
 		Mat cv_img = Mat(targetImage.GetHeight(), targetImage.GetWidth(), CV_8UC1);
 		cv_img = cv::Mat(targetImage.GetHeight(), targetImage.GetWidth(), CV_8UC1, 
@@ -2660,13 +2665,15 @@ BOOL CG_SUB_InspectionDlg::Inspect_function(int index_, Mat template_img,
 	}
 	if (!check_sgn)//NG
 	{
-		rectangle(ori_image, ROI.tl(), ROI.br(), cvScalar(0, 0, 255, 0), 6, 8, 0);
+		rectangle(ori_image, ROI.tl(), ROI.br(), Scalar(46, 60, 199), 6, 8, 0);
 		USES_CONVERSION;
 		CString err_text;
-		err_text.Format(L"err: %.2f", err_value);
+		err_text.Format(L"err: %.2f<st: %.2f>", err_value, threshold);
 		char* err_msg = T2A(err_text.GetBuffer(0));
 		err_text.ReleaseBuffer();
-		putText(ori_image, err_msg, ROI.br(), FONT_HERSHEY_COMPLEX, 2.5, Scalar(0, 0, 255), 2);
+		//error message
+		putText(ori_image, err_msg, Point(ROI.tl().x - 25, ROI.br().y + 50), FONT_HERSHEY_DUPLEX, 
+			2.0, Scalar(46, 60, 199), 2);
 		if (!PathIsDirectory(error_imagefile + current_date))
 		{
 			::CreateDirectory(error_imagefile + current_date, NULL);
@@ -2681,9 +2688,9 @@ BOOL CG_SUB_InspectionDlg::Inspect_function(int index_, Mat template_img,
 		}
 		CString err_date;
 		CTime time(CTime::GetCurrentTime());
-		err_date.Format(L"%02d-%02d-%02d-%s", time.GetHour(),
+		err_date.Format(L"%02d-%02d-%02d-%s-%d-%d", time.GetHour(),
 			time.GetMinute(),
-			time.GetSecond(), current_model);
+			time.GetSecond(), current_model, camera_index, index_);
 		//image
 		temp_str.Format(L"%s%s\\%s-%s.bmp" , error_imagefile, current_date,
 			err_date, inspect_data[camera_index].contents_names[index_]);
@@ -2696,7 +2703,9 @@ BOOL CG_SUB_InspectionDlg::Inspect_function(int index_, Mat template_img,
 	else//OK
 	{
 		rectangle(ori_image, maxLoc, Point(maxLoc.x + tpl_image.cols, maxLoc.y + tpl_image.rows),
-			cvScalar(0, 255, 0, 0), 6, 8, 0);
+			Scalar(140, 183, 127), 6, 8, 0);
+		putText(ori_image, "OK", Point(maxLoc.x + tpl_image.cols, maxLoc.y + tpl_image.rows), 
+			FONT_HERSHEY_DUPLEX, 2.0, Scalar(140, 183, 127), 2);
 	}
 	inspect_img = ori_image.clone();
 	return check_sgn;
