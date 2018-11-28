@@ -8,13 +8,13 @@
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
-      <AdditionalIncludeDirectories>D:\github\G_SUB_Inspection;D:\github\G_SUB_Inspection\Lib;D:\Program Files\OpenCV\opencv\build\x86\include;D:\Program Files\OpenCV\opencv\build\86\include\opencv2;D:\Program Files\OpenCV\opencv\build\86\include\opencv;D:\Program Files\Basler\pylon 5\Development\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>D:\github\G_SUB_Inspection;D:\github\G_SUB_Inspection\Lib;D:\Program Files\OpenCV\opencv\build\x86\include;D:\Program Files\OpenCV\opencv\build\86\include\opencv2;D:\Program Files\OpenCV\opencv\build\86\include\opencv;D:\Program Files\Basler\Development\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>D:\github\G_SUB_Inspection;D:\github\G_SUB_Inspection\Lib;D:\Program Files\OpenCV\opencv\build\x86\vc12\staticlib;D:\Program Files\OpenCV\opencv\build\x86\vc12\lib;D:\Program Files\Basler\pylon 5\Development\lib\Win32;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>D:\github\G_SUB_Inspection;D:\github\G_SUB_Inspection\Lib;D:\Program Files\OpenCV\opencv\build\x86\vc12\staticlib;D:\Program Files\OpenCV\opencv\build\x86\vc12\lib;D:\Program Files\Basler\Development\lib\Win32;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>opencv_world300.lib;w32SQLite3.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>

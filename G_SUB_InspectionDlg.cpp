@@ -2333,12 +2333,31 @@ int CG_SUB_InspectionDlg::camera_initialization()
 	else
 	{
 		//create device
-		cam_basler.Attach(TlFactory.CreateFirstDevice());
-		cam_basler.RegisterConfiguration(new CAcquireContinuousConfiguration, 
-			RegistrationMode_ReplaceAll, Ownership_TakeOwnership);
-		cam_basler.RegisterImageEventHandler(this, RegistrationMode_Append, 
-			Ownership_ExternalOwnership);
-		cam_basler.Open();
+		try
+		{
+			cam_basler.Attach(TlFactory.CreateFirstDevice());
+			cam_basler.RegisterConfiguration(new CAcquireContinuousConfiguration,
+				RegistrationMode_ReplaceAll, Ownership_TakeOwnership);
+			cam_basler.RegisterImageEventHandler(this, RegistrationMode_Append,
+				Ownership_ExternalOwnership);
+			cam_basler.Open();
+		}
+		catch (GenICam::GenericException &e)//const std::exception&
+		{
+			// Error handling
+			string error_m = e.GetDescription();
+			CString message_;
+			message_ = error_m.c_str();
+			if (MessageBox(L"Basler相机初始化发生异常:\r\n" + message_, 
+				L"异常信息", MB_OK | MB_ICONERROR) == IDOK)
+			{
+				cam_initializesign = FALSE;
+				ini_parser.Clear();
+				OnClose();
+				nReturn = -1;
+				return nReturn;
+			}
+		}
 		cam_basler.AcquisitionMode.SetValue(AcquisitionMode_Continuous);
 		// Carry out gain control by using the "continuous" gain auto function.
 		AutoGainContinuous(cam_basler);
@@ -2481,6 +2500,7 @@ void CG_SUB_InspectionDlg::AutoExposureContinuous(Camera_basler& camera_basler)
 	// Set the target value for luminance control. The value is always expressed
 	// as an 8 bit value regardless of the current pixel data output format,
 	// i.e., 0 -> black, 255 -> white.
+
 	camera_basler.AutoTargetValue.SetValue(80);//Gige
 	//camera_basler.AutoTargetBrightness.SetValue(0.3);//USB
 	camera_basler.ExposureAuto.SetValue(ExposureAuto_Continuous);

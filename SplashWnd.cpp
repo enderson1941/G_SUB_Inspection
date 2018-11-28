@@ -166,7 +166,7 @@ BOOL SplashWnd::OnInitDialog()
 		ini_parser.SetValue("Basler Camera", L"frame_height", _str);
 		_str.Format(L"1");//1:Line 0:Software
 		ini_parser.SetValue("Basler Camera", L"trigger_source", _str);
-		_str.Format(L"1000000");
+		_str.Format(L"635000");
 		ini_parser.SetValue("Basler Camera", L"trigger_delay", _str);
 		_str.Format(L"1.5");
 		ini_parser.SetValue("Basler Camera", L"Gamma", _str);
