@@ -158,7 +158,13 @@ BOOL SplashWnd::OnInitDialog()
 		_str.Format(L"1080");
 		ini_parser.SetValue("Camera", L"frame_height", _str);
 		_str.Format(L"15");
-		ini_parser.SetValue("Camera", L"focus", _str);
+		ini_parser.SetValue("Camera", L"focus0", _str);
+		_str.Format(L"15");
+		ini_parser.SetValue("Camera", L"focus1", _str);
+		_str.Format(L"0");
+		ini_parser.SetValue("Camera", L"index0", _str);
+		_str.Format(L"1");
+		ini_parser.SetValue("Camera", L"index1", _str);
 		//
 		_str.Format(L"1920");
 		ini_parser.SetValue("Basler Camera", L"frame_width", _str);

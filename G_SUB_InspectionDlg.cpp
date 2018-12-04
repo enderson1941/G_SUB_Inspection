@@ -505,6 +505,12 @@ void CG_SUB_InspectionDlg::OnTimer(UINT_PTR nIDEvent)
 		}
 		break;
 	}
+	case 2:
+	{
+		KillTimer(1);
+		KillTimer(nIDEvent);
+		break;
+	}
 	default:
 		break;
 	}
@@ -2207,7 +2213,7 @@ BOOL CG_SUB_InspectionDlg::get_produceinfo(HTREEITEM model)
 	}
 	for (int i = 0; i < MAX_CAMERA + 1; i++)
 	{
-		camera_index = i;
+		camera_index = cam_data[i].camera_index;
 		inspect_data[i].contents_remarks.clear();
 		inspect_data[i].contents_remarks.clear();
 		inspect_data[i].ROI.clear();
@@ -2254,8 +2260,12 @@ int CG_SUB_InspectionDlg::camera_initialization()
 	frame_height = _ttoi(temp_str);
 	for (int i = 0; i < MAX_CAMERA; i++)//MAX_CAMERA
 	{
-		cam_data[i].camera_index = i;
-		temp_str = ini_parser.GetValue("Camera", L"focus", size_);
+		CString index_;
+		index_.Format(L"index%d", i);
+		temp_str = ini_parser.GetValue("Camera", index_, size_);
+		cam_data[i].camera_index = _ttoi(temp_str);;
+		index_.Format(L"focus%d", i);
+		temp_str = ini_parser.GetValue("Camera", index_, size_);
 		cam_data[i].focus = _ttoi(temp_str);
 		cam_data[i].cam_web.open(CAP_DSHOW + i);
 		if (cam_data[i].cam_web.isOpened())
@@ -2385,6 +2395,7 @@ int CG_SUB_InspectionDlg::camera_initialization()
 			MB_ICONINFORMATION | MB_OK);
 	}
 	SetTimer(1, 100, NULL);
+	SetTimer(2, 2500, NULL);
 	ini_parser.Clear();
 	cam_initializesign = TRUE;
 	return nReturn;

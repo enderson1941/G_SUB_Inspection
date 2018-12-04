@@ -237,7 +237,8 @@ public:
 	virtual void OnCancel();
 
 	BOOL get_produceinfo(HTREEITEM model);
-	BOOL Inspect_function(int index_, Mat template_img, Mat& inspect_img, Rect ROI, double& threshold);
+	BOOL Inspect_function(int index_, Mat template_img, Mat& inspect_img, 
+		Rect ROI, double& threshold);
 
 	afx_msg void OnClose();
 	afx_msg void OnBnClickedfuncbutton();
