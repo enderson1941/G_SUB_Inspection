@@ -2539,8 +2539,14 @@ void CG_SUB_InspectionDlg::OnImageGrabbed(CInstantCamera& camera_basler,
 				for (int n = 0; n < inspect_data[m].number; n++)
 				{
 					double thres_ = inspect_data[m].threshold[n];
+					inspect_data[m].Error = L"";
 					inspect_data[m].inspect_Result = Inspect_function(n, inspect_data[m].image_file[n], 
-						cam_data[m].frame,	inspect_data[m].ROI[n], thres_);
+						cam_data[m].frame,	inspect_data[m].ROI[n], thres_, inspect_data[m].Error);
+					if (inspect_data[m].Error != L"")
+					{
+						MessageBox(inspect_data[m].contents_remarks[n] + L"检查异常。\r\n详细信息： " +
+							inspect_data[m].Error, L"异常信息", MB_OK || MB_ICONERROR);
+					}
 					disp_image(IDC_inspec, cam_data[m].frame, gsub_ins, CRect(0, 0, 100, 100), m);
 					general_sign *= inspect_data[m].inspect_Result;
 				}
@@ -2549,9 +2555,16 @@ void CG_SUB_InspectionDlg::OnImageGrabbed(CInstantCamera& camera_basler,
 			{
 				camera_index = MAX_CAMERA;
 				double thres_ = inspect_data[MAX_CAMERA].threshold[p];
+				inspect_data[MAX_CAMERA].Error = L"";
 				inspect_data[MAX_CAMERA].inspect_Result = Inspect_function(p, 
 					inspect_data[MAX_CAMERA].image_file[p], basler_frame, 
-					inspect_data[MAX_CAMERA].ROI[p], thres_);
+					inspect_data[MAX_CAMERA].ROI[p], thres_, inspect_data[MAX_CAMERA].Error);
+				if (inspect_data[MAX_CAMERA].Error != L"")
+				{
+					MessageBox(inspect_data[MAX_CAMERA].contents_remarks[p] + 
+						L"检查异常。\r\n详细信息： " + 	inspect_data[MAX_CAMERA].Error, 
+						L"异常信息", MB_OK || MB_ICONERROR);
+				}
 				disp_image(IDC_inspec, basler_frame, gsub_ins, 
 					CRect(0, 0, 100, 100), MAX_CAMERA);
 				general_sign *= inspect_data[MAX_CAMERA].inspect_Result;
@@ -2622,7 +2635,7 @@ void CG_SUB_InspectionDlg::OnImageGrabbed(CInstantCamera& camera_basler,
 #pragma region Inspection
 //Template matching
 BOOL CG_SUB_InspectionDlg::Inspect_function(int index_, Mat template_img, 
-	Mat& inspect_img, Rect ROI, double& threshold)
+	Mat& inspect_img, Rect ROI, double& threshold, CString& Error)
 {
 	int res_cols;
 	int res_rows;
@@ -2661,7 +2674,7 @@ BOOL CG_SUB_InspectionDlg::Inspect_function(int index_, Mat template_img,
 		cvtColor(tpl_image.clone(), tpl_image, CV_BGR2GRAY);
 	}
 	gray_image = gray_image(ROI);
-	for (int i = 0; i < 4; i++)
+	for (int i = 0; i < 4; i++)//0.8 0.9 1.0 1.1
 	{
 		double scale_ = 0.8 + 0.1 * i;
 		cv::resize(tpl_image.clone(), temp_image, 
@@ -2672,7 +2685,15 @@ BOOL CG_SUB_InspectionDlg::Inspect_function(int index_, Mat template_img,
 		if (res_cols < 0 || res_rows < 0)
 		{
 			check_sgn = FALSE;
-			break;
+			if (res_cols < 0)
+			{
+				Error.Format(L"ROI宽度选择不当。\r\n修正参考值:%d", abs(res_cols) + 3);
+			}
+			else
+			{
+				Error.Format(L"ROI高度选择不当。\r\n修正参考值:%d", abs(res_rows) + 3);
+			}
+			return check_sgn;
 		}
 		res_image = Mat(res_cols, res_rows, CV_32FC1);
 

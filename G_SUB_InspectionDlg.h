@@ -124,6 +124,7 @@ public:
 		vector<Rect> ROI;
 		vector<double> threshold;
 		BOOL inspect_Result = FALSE;
+		CString Error = L"";
 	};
 	inspectcontents_data* inspect_data;
 
@@ -238,7 +239,7 @@ public:
 
 	BOOL get_produceinfo(HTREEITEM model);
 	BOOL Inspect_function(int index_, Mat template_img, Mat& inspect_img, 
-		Rect ROI, double& threshold);
+		Rect ROI, double& threshold, CString& Error);
 
 	afx_msg void OnClose();
 	afx_msg void OnBnClickedfuncbutton();
